@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a2b3c;
+  --warm-50: #f0f7ff;
+  --warm-100: #dbeeff;
+  --warm-200: #bfdfff;
+  --warm-300: #93c5fd;
+  --warm-400: #60a5fa;
+  --warm-500: #3b82f6;
+  --warm-600: #2563eb;
+  --warm-700: #1d4ed8;
+  --warm-800: #1e3a5f;
+  --warm-900: #1a2b3c;
+  --accent: #1d6fa4;
+  --accent-hover: #155d8b;
+  --accent-light: #dbeafe;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-warm-50: var(--warm-50);
+  --color-warm-100: var(--warm-100);
+  --color-warm-200: var(--warm-200);
+  --color-warm-300: var(--warm-300);
+  --color-warm-400: var(--warm-400);
+  --color-warm-500: var(--warm-500);
+  --color-warm-600: var(--warm-600);
+  --color-warm-700: var(--warm-700);
+  --color-warm-800: var(--warm-800);
+  --color-warm-900: var(--warm-900);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}

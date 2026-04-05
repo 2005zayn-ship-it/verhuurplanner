@@ -1,0 +1,40 @@
+# Verhuurplanner
+
+> Verhuurplanner.be is een beschikbaarheidskalender voor vakantieverhuurders in België en Nederland.
+> Verhuurders beheren hun reservaties, beschikbaarheid en gasten in één eenvoudig systeem.
+> De kalender kan ingebed worden op de eigen website van de verhuurder.
+
+Verhuurplanner biedt een planningstool speciaal voor verhuurders van vakantiewoningen,
+chalets, appartementen en andere accommodaties. Het systeem laat verhuurders toe om
+beschikbaarheid bij te houden, reservaties te registreren met gastgegevens,
+en de kalender zichtbaar te maken op hun eigen website.
+
+Verhuurders betalen een maandelijks of jaarlijks abonnement: Basic (beschikbaar/bezet + gastnaam),
+Premium (volledige functionaliteit), of Gold (meerdere kalenders).
+
+## Abonnementen
+
+- **Basic** — Beschikbaarheid tonen (bezet/vrij) met gastnaam. Ideaal voor verhuurders met één woning.
+- **Premium** — Volledige reservatiebeheer, notities, inkomsten bijhouden, embed op eigen website. (Binnenkort beschikbaar)
+- **Gold** — Alles van Premium + tot 5 kalenders voor meerdere woningen. (Binnenkort beschikbaar)
+
+## Functies
+
+- Beschikbaarheidskalender per woning
+- Reservaties registreren (gastnaam, periode, notities)
+- Embed code voor eigen website
+- Overzicht van inkomsten per periode
+- Beheer via web — geen app nodig
+
+## Over het platform
+
+- [Prijzen](https://www.verhuurplanner.be/prijzen): Abonnementen en tarieven
+- [Aanmelden](https://www.verhuurplanner.be/aanmelden): Gratis account aanmaken
+- [Functies](https://www.verhuurplanner.be/functies): Overzicht van alle mogelijkheden
+- [Contact](https://www.verhuurplanner.be/contact): Neem contact op
+- [FAQ](https://www.verhuurplanner.be/faq): Veelgestelde vragen
+
+## Optional
+
+- [Privacy beleid](https://www.verhuurplanner.be/privacy): AVG/GDPR privacybeleid
+- [Algemene voorwaarden](https://www.verhuurplanner.be/voorwaarden): Gebruiksvoorwaarden
