@@ -51,7 +51,12 @@ export default function PrijzenPage() {
             binnenkort: true,
           },
         ].map(plan => (
-          <div key={plan.naam} className={`bg-white rounded-2xl border shadow-sm p-8 flex flex-col ${plan.highlight ? "border-accent ring-2 ring-accent/20" : "border-warm-100"}`}>
+          <div key={plan.naam} className={`relative overflow-hidden bg-white rounded-2xl border shadow-sm p-8 flex flex-col ${plan.highlight ? "border-accent ring-2 ring-accent/20" : "border-warm-100"}`}>
+            {plan.binnenkort && (
+              <div className="absolute top-5 -right-8 w-36 bg-amber-400 text-white text-[10px] font-bold text-center py-1 rotate-45 shadow-sm tracking-wide uppercase">
+                Binnenkort
+              </div>
+            )}
             {plan.highlight && <span className="text-xs font-semibold text-accent bg-accent-light px-3 py-1 rounded-full self-start mb-4">Populairste keuze</span>}
             <h2 className="text-xl font-bold text-warm-900">{plan.naam}</h2>
             <div className="mt-2 mb-4">
