@@ -16,8 +16,15 @@ function WachtwoordResetContent() {
 
   useEffect(() => {
     const supabase = createClient();
+
+    // Sessie al aanwezig (PKCE code al uitgewisseld via /auth/callback)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true);
+    });
+
+    // Fallback: hash-based flow vuurt PASSWORD_RECOVERY event
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
       }
     });
