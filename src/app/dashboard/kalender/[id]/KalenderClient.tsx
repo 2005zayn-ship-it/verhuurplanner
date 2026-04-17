@@ -36,9 +36,12 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"kalender" | "embed">("kalender");
   const [copied, setCopied] = useState(false);
+  const [copiedIcal, setCopiedIcal] = useState(false);
 
   const embedCode = `<script src="https://www.verhuurplanner.be/embed/${calendar.public_token}.js" async></script>
 <div id="verhuurplanner-${calendar.public_token}"></div>`;
+
+  const icalUrl = `https://www.verhuurplanner.be/api/ical/${calendar.public_token}.ics`;
 
   function getBookingsForDay(date: Date): Booking[] {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -145,6 +148,12 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
     navigator.clipboard.writeText(embedCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function copyIcal() {
+    navigator.clipboard.writeText(icalUrl);
+    setCopiedIcal(true);
+    setTimeout(() => setCopiedIcal(false), 2000);
   }
 
   // Build calendar grid
@@ -322,6 +331,42 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
             <strong>Hoe installeren?</strong> Plak de code in je website-editor, net voor de sluitende &lt;/body&gt;-tag.
             Werkt op WordPress, Wix, Squarespace en elke andere website.
+          </div>
+
+          <hr className="border-warm-100 my-8" />
+
+          <h2 className="text-lg font-semibold text-warm-900 mb-2">iCal URL</h2>
+          <p className="text-warm-500 text-sm mb-6">
+            Gebruik deze link om jouw kalender te synchroniseren met Google Agenda, Outlook, Apple Kalender of andere boekingssystemen. Elke wijziging in je kalender wordt automatisch doorgegeven.
+          </p>
+
+          <div className="bg-warm-900 rounded-xl p-4 mb-4 relative">
+            <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">
+              {icalUrl}
+            </pre>
+            <button
+              onClick={copyIcal}
+              className="absolute top-3 right-3 bg-warm-700 hover:bg-warm-600 text-warm-200 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              {copiedIcal ? (
+                <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>Gekopieerd</>
+              ) : (
+                <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Kopiëren</>
+              )}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { name: "Google Agenda", hint: "Andere agenda's > Via URL" },
+              { name: "Outlook", hint: "Agenda toevoegen > Via internet" },
+              { name: "Apple Kalender", hint: "Archief > Abonneren..." },
+            ].map(({ name, hint }) => (
+              <div key={name} className="bg-warm-50 border border-warm-100 rounded-xl p-3 text-xs text-warm-600">
+                <p className="font-semibold text-warm-800 mb-0.5">{name}</p>
+                <p className="text-warm-400">{hint}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
