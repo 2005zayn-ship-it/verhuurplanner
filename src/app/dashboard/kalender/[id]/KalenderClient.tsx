@@ -34,7 +34,7 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [formData, setFormData] = useState({ gastNaam: "", status: "bezet" as BookingStatus, notities: "" });
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"kalender" | "embed">("kalender");
+  const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
   const [copied, setCopied] = useState(false);
   const [copiedIcal, setCopiedIcal] = useState(false);
 
@@ -192,6 +192,9 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
           <button onClick={() => setActiveTab("embed")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "embed" ? "bg-white text-warm-900 shadow-sm" : "text-warm-500 hover:text-warm-700"}`}>
             Embed code
           </button>
+          <button onClick={() => setActiveTab("ical")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "ical" ? "bg-white text-warm-900 shadow-sm" : "text-warm-500 hover:text-warm-700"}`}>
+            iCal URL
+          </button>
         </div>
       </div>
 
@@ -333,8 +336,11 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
             Werkt op WordPress, Wix, Squarespace en elke andere website.
           </div>
 
-          <hr className="border-warm-100 my-8" />
+        </div>
+      )}
 
+      {activeTab === "ical" && (
+        <div className="bg-white rounded-2xl border border-warm-100 shadow-sm p-8">
           <h2 className="text-lg font-semibold text-warm-900 mb-2">iCal URL</h2>
           <p className="text-warm-500 text-sm mb-6">
             Gebruik deze link om jouw kalender te synchroniseren met Google Agenda, Outlook, Apple Kalender of andere boekingssystemen. Elke wijziging in je kalender wordt automatisch doorgegeven.
