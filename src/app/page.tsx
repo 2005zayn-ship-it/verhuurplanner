@@ -66,6 +66,16 @@ const features = [
     titel: "Altijd up-to-date",
     tekst: "Wijzig je kalender en bezoekers van je website zien het meteen. Geen handmatige synchronisatie nodig.",
   },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4M8 14h4M8 17h2" />
+      </svg>
+    ),
+    titel: "iCal synchronisatie",
+    tekst: "Koppel je kalender aan Google Agenda, Outlook of Apple Kalender via een iCal URL. Bezettingen worden automatisch doorgegeven.",
+  },
 ];
 
 const plans = [
@@ -79,6 +89,7 @@ const plans = [
       "Beschikbaarheid tonen (bezet/vrij)",
       "Gastnaam per periode",
       "Embed op je website",
+      "iCal URL (Google Agenda, Outlook, Apple)",
       "Notities per boeking",
     ],
     nee: ["Inkomsten bijhouden", "Meerdere kalenders", "Prioritair support"],

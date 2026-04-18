@@ -93,11 +93,19 @@ export default async function DashboardPage() {
               </div>
               <h3 className="font-semibold text-warm-900 mb-1">{cal.naam}</h3>
               {cal.woning_naam && <p className="text-sm text-warm-400">{cal.woning_naam}</p>}
-              <div className="mt-4 pt-4 border-t border-warm-50 text-xs text-warm-400 flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-                Embed beschikbaar
+              <div className="mt-4 pt-4 border-t border-warm-50 text-xs text-warm-400 flex items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  Embed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" />
+                  </svg>
+                  iCal
+                </span>
               </div>
             </Link>
           ))}
