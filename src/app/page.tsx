@@ -207,8 +207,27 @@ const plans = [
 ];
 
 export default function HomePage() {
+  const softwareApplicationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Verhuurplanner",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "EUR",
+    },
+    description: "Beschikbaarheidskalender voor vakantieverhuurders",
+    url: "https://www.verhuurplanner.be",
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-br from-warm-800 to-accent pt-20 pb-28 px-4 text-white text-center">
         <div className="max-w-3xl mx-auto">
