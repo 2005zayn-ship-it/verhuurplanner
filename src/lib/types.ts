@@ -1,6 +1,13 @@
 export type Plan = "basic" | "premium" | "gold";
 export type PaymentStatus = "betaald" | "onbetaald";
 export type BookingStatus = "bezet" | "optie" | "geblokkeerd";
+export type BookingBron =
+  | "eigen_website"
+  | "vakantiewoningen_be"
+  | "rechtstreeks"
+  | "import"
+  | "andere"
+  | null;
 
 export interface Profile {
   id: string;
@@ -30,5 +37,6 @@ export interface Booking {
   gast_naam: string | null;
   status: BookingStatus;
   notities: string | null;
+  bron: BookingBron;
   created_at: string;
 }

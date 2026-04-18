@@ -150,6 +150,7 @@ export async function POST(
         gast_naam: `[import] ${event.summary}`,
         status: "geblokkeerd" as const,
         notities: `Geïmporteerd van ${importUrl.naam}`,
+        bron: "import" as const,
       }));
 
       const { error: insertError } = await admin

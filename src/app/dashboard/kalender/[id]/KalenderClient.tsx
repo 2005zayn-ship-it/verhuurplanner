@@ -18,6 +18,30 @@ interface Props {
   initialIcalImports: IcalImport[];
 }
 
+const BRON_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Onbekend" },
+  { value: "eigen_website", label: "Eigen website" },
+  { value: "vakantiewoningen_be", label: "vakantiewoningen-in-belgie.be" },
+  { value: "rechtstreeks", label: "Rechtstreeks (telefoon / mail)" },
+  { value: "andere", label: "Andere" },
+];
+
+const BRON_LABELS: Record<string, string> = {
+  eigen_website: "Eigen website",
+  vakantiewoningen_be: "vakantiewoningen-in-belgie.be",
+  rechtstreeks: "Rechtstreeks",
+  import: "iCal import",
+  andere: "Andere",
+};
+
+const BRON_COLORS: Record<string, string> = {
+  eigen_website: "bg-accent text-white",
+  vakantiewoningen_be: "bg-green-500 text-white",
+  rechtstreeks: "bg-warm-600 text-white",
+  import: "bg-warm-300 text-warm-800",
+  andere: "bg-warm-200 text-warm-700",
+};
+
 const STATUS_LABELS: Record<BookingStatus, string> = {
   bezet: "Bezet",
   optie: "Optie",
@@ -38,7 +62,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [selecting, setSelecting] = useState(false);
   const [modal, setModal] = useState<"new" | "edit" | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [formData, setFormData] = useState({ gastNaam: "", status: "bezet" as BookingStatus, notities: "" });
+  const [formData, setFormData] = useState({ gastNaam: "", status: "bezet" as BookingStatus, notities: "", bron: "" });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
   const [copied, setCopied] = useState(false);
@@ -68,7 +92,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const dayBookings = getBookingsForDay(date);
     if (dayBookings.length > 0) {
       setEditingBooking(dayBookings[0]);
-      setFormData({ gastNaam: dayBookings[0].gast_naam || "", status: dayBookings[0].status, notities: dayBookings[0].notities || "" });
+      setFormData({ gastNaam: dayBookings[0].gast_naam || "", status: dayBookings[0].status, notities: dayBookings[0].notities || "", bron: dayBookings[0].bron || "" });
       setModal("edit");
       return;
     }
@@ -83,7 +107,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       setSelectStart(actualStart);
       setSelectEnd(end);
       setSelecting(false);
-      setFormData({ gastNaam: "", status: "bezet", notities: "" });
+      setFormData({ gastNaam: "", status: "bezet", notities: "", bron: "" });
       setModal("new");
     }
   }
@@ -112,6 +136,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         gast_naam: formData.gastNaam || null,
         status: formData.status,
         notities: formData.notities || null,
+        bron: formData.bron || null,
       })
       .select()
       .single();
@@ -128,11 +153,11 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const supabase = createClient();
     const { error } = await supabase
       .from("bookings")
-      .update({ gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null })
+      .update({ gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null, bron: formData.bron || null })
       .eq("id", editingBooking.id);
     if (!error) {
       setBookings(prev => prev.map(b => b.id === editingBooking.id
-        ? { ...b, gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null }
+        ? { ...b, gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null, bron: (formData.bron || null) as import("@/lib/types").BookingBron }
         : b
       ));
     }
@@ -369,9 +394,14 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                         {format(parseISO(b.start_datum), "d MMM", { locale: nl })} — {format(parseISO(b.eind_datum), "d MMM yyyy", { locale: nl })}
                       </span>
                       {b.gast_naam && <span className="text-sm text-warm-500">{b.gast_naam}</span>}
+                      {b.bron && b.bron !== "import" && (
+                        <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${BRON_COLORS[b.bron] ?? "bg-warm-100 text-warm-600"}`}>
+                          {BRON_LABELS[b.bron] ?? b.bron}
+                        </span>
+                      )}
                       <button
-                        onClick={() => { setEditingBooking(b); setFormData({ gastNaam: b.gast_naam || "", status: b.status, notities: b.notities || "" }); setModal("edit"); }}
-                        className="ml-auto text-xs text-warm-400 hover:text-accent transition-colors"
+                        onClick={() => { setEditingBooking(b); setFormData({ gastNaam: b.gast_naam || "", status: b.status, notities: b.notities || "", bron: b.bron || "" }); setModal("edit"); }}
+                        className={`${b.bron && b.bron !== "import" ? "" : "ml-auto"} text-xs text-warm-400 hover:text-accent transition-colors shrink-0`}
                       >
                         Bewerken
                       </button>
@@ -380,6 +410,46 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               </div>
             )}
           </div>
+
+          {/* Herkomst statistieken */}
+          {(() => {
+            const echteBoekingen = bookings.filter(b => b.status !== "geblokkeerd");
+            if (echteBoekingen.length === 0) return null;
+            const totaal = echteBoekingen.length;
+            const perBron: Record<string, number> = {};
+            for (const b of echteBoekingen) {
+              const key = b.bron ?? "onbekend";
+              perBron[key] = (perBron[key] ?? 0) + 1;
+            }
+            const sorted = Object.entries(perBron).sort((a, b) => b[1] - a[1]);
+            return (
+              <div className="border-t border-warm-100 px-6 py-4">
+                <h3 className="text-sm font-semibold text-warm-700 mb-3">Herkomst boekingen</h3>
+                <div className="space-y-2.5">
+                  {sorted.map(([bron, aantal]) => {
+                    const pct = Math.round((aantal / totaal) * 100);
+                    const label = bron === "onbekend" ? "Onbekend" : (BRON_LABELS[bron] ?? bron);
+                    const barColor =
+                      bron === "eigen_website" ? "bg-accent" :
+                      bron === "vakantiewoningen_be" ? "bg-green-500" :
+                      bron === "rechtstreeks" ? "bg-warm-500" :
+                      bron === "import" ? "bg-warm-300" : "bg-warm-200";
+                    return (
+                      <div key={bron}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-warm-700 font-medium">{label}</span>
+                          <span className="text-warm-400">{aantal} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -526,6 +596,26 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               </div>
             )}
 
+            {/* Platform shortcuts */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <p className="w-full text-xs text-warm-400 mb-1">Snel toevoegen:</p>
+              {[
+                { naam: "Airbnb", kleur: "bg-[#FF5A5F]/10 text-[#FF5A5F] border-[#FF5A5F]/20 hover:bg-[#FF5A5F]/20" },
+                { naam: "Booking.com", kleur: "bg-[#003580]/10 text-[#003580] border-[#003580]/20 hover:bg-[#003580]/20" },
+                { naam: "Tripadvisor", kleur: "bg-[#34E0A1]/20 text-green-700 border-green-200 hover:bg-[#34E0A1]/30" },
+                { naam: "Micazu", kleur: "bg-[#0077C8]/10 text-[#0077C8] border-[#0077C8]/20 hover:bg-[#0077C8]/20" },
+                { naam: "vakantiewoningen-in-belgie.be", kleur: "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20" },
+              ].map(p => (
+                <button
+                  key={p.naam}
+                  onClick={() => setImportNaam(p.naam)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${p.kleur}`}
+                >
+                  {p.naam}
+                </button>
+              ))}
+            </div>
+
             {/* Add import URL form */}
             <div className="bg-warm-50 border border-warm-100 rounded-xl p-4 mb-5">
               <p className="text-sm font-medium text-warm-700 mb-3">URL toevoegen</p>
@@ -642,6 +732,16 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst (optioneel)</label>
+                <select
+                  value={formData.bron}
+                  onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                >
+                  {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={cancelModal} className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-xl text-sm hover:bg-warm-50 transition-colors">
@@ -703,6 +803,16 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   placeholder="Aankomsttijd, sleutelafspraak..."
                   className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst</label>
+                <select
+                  value={formData.bron}
+                  onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                >
+                  {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
               </div>
             </div>
             <div className="flex gap-3 mt-6">

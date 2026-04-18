@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Verhuurplanner | Beschikbaarheidskalender voor vakantieverhuurders",
-  description: "Beheer je beschikbaarheid en reservaties in één eenvoudige kalender. Gratis starten. Geen technische kennis nodig.",
+  title: "Verhuurplanner | Compleet reserveringssysteem voor vakantieverhuurders",
+  description: "Boekingen, betalingen en communicatie in één platform. Geen losse mails, geen manuele opvolging. Gratis starten.",
   alternates: { canonical: "https://www.verhuurplanner.be" },
 };
 
@@ -69,7 +69,7 @@ const features = [
       </svg>
     ),
     titel: "Betalingen ontvangen",
-    tekst: "Stuur betaalverzoeken naar gasten en ontvang huurbetalingen rechtstreeks. Geen aansluitkosten, geen gedoe.",
+    tekst: "Gasten betalen bij het boeken via een beveiligde betaalpagina. Automatische opvolging zonder dat jij erachteraan moet.",
     plan: "Pro",
   },
   {
@@ -80,7 +80,7 @@ const features = [
       </svg>
     ),
     titel: "Boekingen ontvangen",
-    tekst: "Laat vakantiegangers een reservatieverzoek sturen via je eigen website. Met prijzen, services en kortingscodes.",
+    tekst: "Gasten boeken rechtstreeks via je eigen website. Jij krijgt een melding, zij krijgen een bevestiging. Geen losse mails meer.",
     plan: "Pro",
   },
   {
@@ -91,7 +91,7 @@ const features = [
       </svg>
     ),
     titel: "E-mail templates",
-    tekst: "Automatisch bevestigings- en herinneringsmails versturen naar gasten. Met jouw eigen tekst en huisstijl.",
+    tekst: "Stel je eigen e-mailtemplates in voor boekingsbevestigingen en herinneringen. Jij configureert ze eenmalig, het systeem verstuurt.",
     plan: "Pro",
   },
   {
@@ -218,7 +218,7 @@ export default function HomePage() {
       price: "0",
       priceCurrency: "EUR",
     },
-    description: "Beschikbaarheidskalender voor vakantieverhuurders",
+    description: "Compleet reserveringssysteem voor vakantieverhuurders. Boekingen, betalingen en communicatie in één platform.",
     url: "https://www.verhuurplanner.be",
   };
 
@@ -239,11 +239,11 @@ export default function HomePage() {
               Gratis starten — geen creditcard nodig
             </div>
             <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight mb-5">
-              Jouw vakantiewoning,<br />
-              <span className="text-white/70">altijd up-to-date</span>
+              Jouw verhuuradministratie,<br />
+              <span className="text-white/70">volledig geautomatiseerd.</span>
             </h1>
             <p className="text-lg text-white/75 mb-8 max-w-lg">
-              Beheer je beschikbaarheid, synchroniseer met Airbnb en Booking.com, en toon je kalender op je eigen website. Klaar in 2 minuten.
+              Geen losse mails, geen manuele opvolging. Boekingen, betalingen en communicatie lopen automatisch via één platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
               <Link href="/aanmelden" className="bg-white text-accent font-bold px-8 py-3.5 rounded-xl hover:bg-warm-50 transition-colors text-base shadow-lg">
@@ -365,6 +365,207 @@ export default function HomePage() {
             Nu starten
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </Link>
+        </div>
+      </section>
+
+      {/* Meer dan een kalender */}
+      <section className="bg-warm-50 py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-semibold text-accent uppercase tracking-widest">Pro functies</span>
+            <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-3">Meer dan een kalender</h2>
+            <p className="text-warm-500 max-w-lg mx-auto">
+              Verhuurplanner beheert het volledige traject van eerste aanvraag tot betaling en afreis.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Automatische communicatie */}
+            <div className="bg-white rounded-2xl border border-warm-100 p-7 shadow-sm flex flex-col">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-11 h-11 rounded-xl bg-accent-light flex items-center justify-center text-accent shrink-0">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </div>
+                <span className="text-xs font-semibold bg-accent text-white px-2.5 py-0.5 rounded-full">Pro</span>
+              </div>
+              <h3 className="font-bold text-warm-900 text-lg mb-2">Automatische communicatie</h3>
+              <p className="text-sm text-warm-500 leading-relaxed">
+                Stel e-mailtemplates in voor bevestigingen en herinneringen. Jij configureert, het systeem verstuurt.
+              </p>
+            </div>
+
+            {/* Online betalingen */}
+            <div className="bg-white rounded-2xl border border-warm-100 p-7 shadow-sm flex flex-col">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-11 h-11 rounded-xl bg-accent-light flex items-center justify-center text-accent shrink-0">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="1" y="4" width="22" height="16" rx="2" />
+                    <path d="M1 10h22" />
+                  </svg>
+                </div>
+                <span className="text-xs font-semibold bg-accent text-white px-2.5 py-0.5 rounded-full">Pro</span>
+              </div>
+              <h3 className="font-bold text-warm-900 text-lg mb-2">Online betalingen</h3>
+              <p className="text-sm text-warm-500 leading-relaxed">
+                Laat gasten betalen bij het boeken. Automatische opvolging zonder dat jij erachteraan moet.
+              </p>
+            </div>
+
+            {/* Boekingsmodule */}
+            <div className="bg-white rounded-2xl border border-warm-100 p-7 shadow-sm flex flex-col">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-11 h-11 rounded-xl bg-accent-light flex items-center justify-center text-accent shrink-0">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <span className="text-xs font-semibold bg-accent text-white px-2.5 py-0.5 rounded-full">Pro</span>
+              </div>
+              <h3 className="font-bold text-warm-900 text-lg mb-2">Boekingsmodule op je site</h3>
+              <p className="text-sm text-warm-500 leading-relaxed">
+                Gasten boeken rechtstreeks via je eigen website. Jij krijgt een melding, zij krijgen een bevestiging.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* iCal sync — dubbele boekingen */}
+      <section className="py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Hub visual */}
+            <div className="relative flex items-center justify-center h-72">
+              {/* Center */}
+              <div className="absolute z-10 w-24 h-24 bg-warm-900 rounded-2xl flex flex-col items-center justify-center shadow-xl">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+                <span className="text-white text-xs font-semibold mt-1 leading-tight text-center px-1">Verhuur-planner</span>
+              </div>
+              {/* Platforms — orbiting */}
+              {[
+                { naam: "Booking", kleur: "bg-[#003580] text-white", pos: "top-0 left-1/2 -translate-x-1/2" },
+                { naam: "Airbnb", kleur: "bg-[#FF5A5F] text-white", pos: "top-1/2 right-0 -translate-y-1/2" },
+                { naam: "Tripadvisor", kleur: "bg-[#34E0A1] text-warm-900", pos: "bottom-0 left-1/2 -translate-x-1/2" },
+                { naam: "Micazu", kleur: "bg-[#0077C8] text-white", pos: "top-1/2 left-0 -translate-y-1/2" },
+                { naam: "vakantie-woningen.be", kleur: "bg-accent text-white", pos: "top-6 right-12" },
+              ].map(p => (
+                <div key={p.naam} className={`absolute ${p.pos} ${p.kleur} rounded-xl px-3 py-2 text-xs font-bold shadow-md text-center leading-tight`}>
+                  {p.naam}
+                </div>
+              ))}
+              {/* Connection lines (decorative) */}
+              <div className="absolute inset-0 rounded-full border-2 border-dashed border-warm-100" style={{ width: "85%", height: "85%", top: "7.5%", left: "7.5%" }} />
+            </div>
+
+            {/* Text */}
+            <div>
+              <span className="text-xs font-semibold text-accent uppercase tracking-widest">iCal synchronisatie</span>
+              <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-4">Dubbele boekingen<br />zijn verleden tijd.</h2>
+              <p className="text-warm-500 mb-6 leading-relaxed">Verhuur je via Airbnb, Booking.com, Tripadvisor of Micazu? Koppel hun kalender aan Verhuurplanner en alle bezettingen verschijnen automatisch in jouw overzicht. Jij voert niets dubbel in.</p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Elke boeking van elk platform in één kalender",
+                  "Automatisch gesynchroniseerd via iCal",
+                  "Werkt ook met vakantiewoningen-in-belgie.be",
+                  "Geen technische kennis nodig",
+                ].map(t => (
+                  <li key={t} className="flex items-start gap-2.5 text-sm text-warm-700">
+                    <svg className="w-4 h-4 text-green-500 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <a href="/aanmelden" className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm">
+                Gratis koppelen
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Embed — kalender op je website */}
+      <section className="bg-warm-50 py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Text */}
+            <div>
+              <span className="text-xs font-semibold text-accent uppercase tracking-widest">Beschikbaarheidswidget</span>
+              <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-4">Je kalender op je<br />eigen website.</h2>
+              <p className="text-warm-500 mb-6 leading-relaxed">Kopieer één regel code en plak die op je website. Je bezoekers zien direct wanneer je woning vrij is. Altijd up-to-date, geen handmatig aanpassen.</p>
+              <ul className="space-y-3 mb-6">
+                {[
+                  "Werkt op elke website en elk platform",
+                  "Automatisch bijgewerkt bij elke wijziging",
+                  "Kleur aanpasbaar aan je huisstijl",
+                  "Toont enkel beschikbaarheid — geen gastgegevens",
+                ].map(t => (
+                  <li key={t} className="flex items-start gap-2.5 text-sm text-warm-700">
+                    <svg className="w-4 h-4 text-green-500 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              {/* Platform badges */}
+              <div className="flex flex-wrap gap-2 mb-8">
+                {["WordPress", "Wix", "Squarespace", "Webflow", "HTML", "Joomla"].map(p => (
+                  <span key={p} className="bg-white border border-warm-200 text-warm-700 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">{p}</span>
+                ))}
+              </div>
+              <a href="/aanmelden" className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm">
+                Gratis embed instellen
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+            </div>
+
+            {/* Embed mockup */}
+            <div className="bg-white rounded-2xl shadow-xl border border-warm-100 overflow-hidden max-w-sm mx-auto w-full">
+              <div className="border-t-4 border-accent px-4 py-3 border-b border-warm-100 flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-warm-900 text-sm">Chalet de Ardennen</div>
+                  <div className="text-xs text-warm-400">Beschikbaarheidskalender</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="w-7 h-7 rounded-lg bg-warm-50 flex items-center justify-center text-warm-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                  </button>
+                  <span className="text-xs font-medium text-warm-700 w-24 text-center">mei 2026</span>
+                  <button className="w-7 h-7 rounded-lg bg-warm-50 flex items-center justify-center text-warm-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-7 gap-0.5 mb-1">
+                  {["Ma","Di","Wo","Do","Vr","Za","Zo"].map(d => (
+                    <div key={d} className="text-center text-xs text-warm-300 py-1">{d}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-0.5">
+                  {[...Array(3)].map((_,i) => <div key={`p${i}`} />)}
+                  {Array.from({length:31},(_,i)=>i+1).map(day => {
+                    const bezet = [1,2,3,4,5,6,7,16,17,18,19,20,21,22,29,30,31].includes(day);
+                    const vrij = [8,9,10,11,12,13,14,15,23,24,25,26,27,28].includes(day);
+                    return (
+                      <div key={day} className={`text-center py-1.5 rounded text-xs font-medium ${
+                        bezet ? "bg-red-100 text-red-600" : vrij ? "text-warm-600" : "text-warm-400"
+                      }`}>{day}</div>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-3 mt-3 pt-3 border-t border-warm-50 text-xs text-warm-400 justify-center">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-100 inline-block"/>Bezet</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-warm-100 inline-block"/>Vrij</span>
+                </div>
+              </div>
+              <div className="border-t border-warm-50 px-4 py-2 text-center">
+                <span className="text-xs text-warm-300">verhuurplanner.be</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -506,9 +707,9 @@ export default function HomePage() {
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto bg-gradient-to-br from-warm-900 to-accent rounded-3xl px-8 py-14 text-center text-white shadow-xl">
           <div className="text-4xl mb-4">📅</div>
-          <h2 className="text-3xl font-extrabold mb-4">Klaar om te starten?</h2>
+          <h2 className="text-3xl font-extrabold mb-4">Klaar om je verhuuradministratie te automatiseren?</h2>
           <p className="text-white/75 mb-8 text-lg max-w-xl mx-auto">
-            Je eerste kalender staat in minder dan 2 minuten online. Gratis, zonder creditcard.
+            Je eerste kalender staat in 2 minuten online. Gratis starten, upgraden wanneer je wil.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/aanmelden" className="bg-white text-accent font-bold px-10 py-4 rounded-xl hover:bg-warm-50 transition-colors text-base shadow-md">
