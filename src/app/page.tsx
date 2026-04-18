@@ -17,6 +17,7 @@ const features = [
     ),
     titel: "Maandkalender per woning",
     tekst: "Bekijk en beheer je beschikbaarheid per maand. Bezet, vrij of optie — in één oogopslag duidelijk.",
+    plan: null,
   },
   {
     icon: (
@@ -25,8 +26,9 @@ const features = [
         <circle cx="9" cy="7" r="4" />
       </svg>
     ),
-    titel: "Gastnaam per periode",
-    tekst: "Noteer wie wanneer verblijft. Ideaal als geheugensteuntje en voor een vlotte communicatie.",
+    titel: "Gastnaam en notities",
+    tekst: "Noteer wie wanneer verblijft. Aankomsttijd, sleutelafspraak, speciale wensen — alles bij de boeking.",
+    plan: null,
   },
   {
     icon: (
@@ -35,36 +37,8 @@ const features = [
       </svg>
     ),
     titel: "Embed op je eigen website",
-    tekst: "Toon je beschikbaarheidskalender op je eigen website met één regel code. Automatisch bijgewerkt.",
-  },
-  {
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="5" y="2" width="14" height="20" rx="2" />
-        <path d="M9 7h6M9 11h6M9 15h4" />
-      </svg>
-    ),
-    titel: "Notities per boeking",
-    tekst: "Voeg notities toe aan elke reservatie. Aankomsttijd, sleutelafspraak, speciale wensen — alles op één plek.",
-  },
-  {
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-    ),
-    titel: "Veilig en privé",
-    tekst: "Jouw kalenderdata is privé. Alleen jij ziet de gastgegevens. De publieke embed toont enkel beschikbaarheid.",
-  },
-  {
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 6v6l4 2" />
-      </svg>
-    ),
-    titel: "Altijd up-to-date",
-    tekst: "Wijzig je kalender en bezoekers van je website zien het meteen. Geen handmatige synchronisatie nodig.",
+    tekst: "Toon je beschikbaarheidskalender op je website met één regel code. Automatisch bijgewerkt, altijd correct.",
+    plan: null,
   },
   {
     icon: (
@@ -73,8 +47,96 @@ const features = [
         <path d="M3 9h18M8 2v4M16 2v4M8 14h4M8 17h2" />
       </svg>
     ),
-    titel: "iCal synchronisatie",
-    tekst: "Koppel je kalender aan Google Agenda, Outlook of Apple Kalender via een iCal URL. Bezettingen worden automatisch doorgegeven.",
+    titel: "iCal export en import",
+    tekst: "Exporteer naar Google Agenda, Outlook of Apple Kalender. Importeer bezettingen van Airbnb of Booking.com automatisch.",
+    plan: "Lite",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+    titel: "Beschikbaarheid delen",
+    tekst: "Stuur gasten een directe link naar je beschikbaarheidskalender. Geen login nodig, altijd up-to-date.",
+    plan: "Lite",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="1" y="4" width="22" height="16" rx="2" />
+        <path d="M1 10h22" />
+      </svg>
+    ),
+    titel: "Betalingen ontvangen",
+    tekst: "Stuur betaalverzoeken naar gasten en ontvang huurbetalingen rechtstreeks. Geen aansluitkosten, geen gedoe.",
+    plan: "Pro",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    ),
+    titel: "Boekingen ontvangen",
+    tekst: "Laat vakantiegangers een reservatieverzoek sturen via je eigen website. Met prijzen, services en kortingscodes.",
+    plan: "Pro",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <polyline points="22,6 12,13 2,6" />
+      </svg>
+    ),
+    titel: "E-mail templates",
+    tekst: "Automatisch bevestigings- en herinneringsmails versturen naar gasten. Met jouw eigen tekst en huisstijl.",
+    plan: "Pro",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    ),
+    titel: "Rapportages",
+    tekst: "Bekijk je bezettingsgraad, inkomsten en boekingsoverzicht per periode. Handig voor je boekhouding.",
+    plan: "Pro",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12 19.79 19.79 0 0 1 1.93 3.18 2 2 0 0 1 3.9 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+      </svg>
+    ),
+    titel: "SMS alerts",
+    tekst: "Ontvang een sms bij elke nieuwe boeking of betaling. Nooit een reservatie missen, ook niet onderweg.",
+    plan: "Pro",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+    titel: "Veilig en privé",
+    tekst: "Gastgegevens zijn enkel voor jou zichtbaar. De publieke kalender toont alleen beschikbaarheid, nooit namen.",
+    plan: null,
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+    titel: "Gebruikersrollen",
+    tekst: "Geef medewerkers of mede-verhuurders toegang tot specifieke kalenders, zonder volledige beheerdersrechten.",
+    plan: "Pro",
   },
 ];
 
@@ -220,9 +282,18 @@ export default function HomePage() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((f) => (
-            <div key={f.titel} className="bg-white rounded-2xl border border-warm-100 p-6 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center text-accent mb-4">
-                {f.icon}
+            <div key={f.titel} className="bg-white rounded-2xl border border-warm-100 p-6 shadow-sm flex flex-col">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center text-accent shrink-0">
+                  {f.icon}
+                </div>
+                {f.plan && (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    f.plan === "Pro" ? "bg-accent text-white" : "bg-accent-light text-accent"
+                  }`}>
+                    {f.plan}
+                  </span>
+                )}
               </div>
               <h3 className="font-semibold text-warm-900 mb-2">{f.titel}</h3>
               <p className="text-sm text-warm-500 leading-relaxed">{f.tekst}</p>
