@@ -228,75 +228,154 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
       />
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-warm-800 to-accent pt-20 pb-28 px-4 text-white text-center">
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
-            <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-            Gratis starten — geen creditcard nodig
+
+      {/* Hero — tweekolomslayout */}
+      <section className="bg-gradient-to-br from-warm-900 via-warm-800 to-accent px-4 pt-16 pb-8 md:pt-20 md:pb-0 overflow-hidden">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-10">
+          {/* Tekst */}
+          <div className="flex-1 text-white text-center md:text-left pb-4 md:pb-16">
+            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
+              <span className="w-2 h-2 rounded-full bg-green-400 inline-block animate-pulse" />
+              Gratis starten — geen creditcard nodig
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight mb-5">
+              Jouw vakantiewoning,<br />
+              <span className="text-white/70">altijd up-to-date</span>
+            </h1>
+            <p className="text-lg text-white/75 mb-8 max-w-lg">
+              Beheer je beschikbaarheid, synchroniseer met Airbnb en Booking.com, en toon je kalender op je eigen website. Klaar in 2 minuten.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+              <Link href="/aanmelden" className="bg-white text-accent font-bold px-8 py-3.5 rounded-xl hover:bg-warm-50 transition-colors text-base shadow-lg">
+                Gratis starten
+              </Link>
+              <Link href="#hoe-het-werkt" className="border border-white/30 text-white font-semibold px-8 py-3.5 rounded-xl hover:bg-white/10 transition-colors text-base">
+                Hoe werkt het?
+              </Link>
+            </div>
+            {/* Trust signals */}
+            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-8 text-sm text-white/50 justify-center md:justify-start">
+              <span className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Geen creditcard
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Data opgeslagen in de EU
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
+                AVG/GDPR-conform
+              </span>
+            </div>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight mb-5">
-            Jouw beschikbaarheidskalender,<br className="hidden sm:block" /> altijd up-to-date
-          </h1>
-          <p className="text-lg text-white/80 mb-8 max-w-xl mx-auto">
-            Beheer je reservaties en toon je beschikbaarheid op je eigen website.
-            Eenvoudig, snel en zonder technische kennis.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/aanmelden" className="bg-white text-accent font-bold px-8 py-3.5 rounded-xl hover:bg-warm-50 transition-colors text-base">
-              Gratis starten
-            </Link>
-            <Link href="/prijzen" className="border border-white/30 text-white font-semibold px-8 py-3.5 rounded-xl hover:bg-white/10 transition-colors text-base">
-              Bekijk plannen
-            </Link>
+
+          {/* Kalender mockup — zweeft uit de hero */}
+          <div className="flex-1 w-full max-w-md md:max-w-none md:translate-y-10">
+            <div className="bg-white rounded-2xl shadow-2xl border border-warm-100 overflow-hidden">
+              <div className="bg-warm-50 border-b border-warm-100 px-5 py-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-300" />
+                  <div className="w-3 h-3 rounded-full bg-amber-300" />
+                  <div className="w-3 h-3 rounded-full bg-green-300" />
+                </div>
+                <span className="text-sm font-semibold text-warm-700">Chalet de Ardennen — Mei 2026</span>
+                <div className="flex gap-3 text-xs text-warm-400">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-200 inline-block" />Bezet</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-200 inline-block" />Optie</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-100 border border-green-200 inline-block" />Vrij</span>
+                </div>
+              </div>
+              <div className="p-5">
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map((d) => (
+                    <div key={d} className="text-xs text-warm-400 font-medium py-1">{d}</div>
+                  ))}
+                  {[...Array(3)].map((_, i) => <div key={`e${i}`} />)}
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                    const bezet = [1,2,3,4,5,6,7,8,16,17,18,19,20,21,22,29,30,31].includes(day);
+                    const optie = [13,14,15].includes(day);
+                    return (
+                      <div key={day} className={`py-2 rounded-lg text-sm font-medium ${
+                        bezet ? "bg-red-100 text-red-700" :
+                        optie ? "bg-amber-100 text-amber-700" :
+                        "text-warm-600 bg-green-50"
+                      }`}>
+                        {day}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Boeking detail strip */}
+              <div className="border-t border-warm-100 px-5 py-3 flex items-center gap-3 bg-warm-50">
+                <div className="w-7 h-7 rounded-full bg-accent-light flex items-center justify-center text-accent text-xs font-bold shrink-0">JV</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-warm-900">Jan Vermeersch</div>
+                  <div className="text-xs text-warm-400">1–8 mei · Aankomst 15u · Huisdier mee</div>
+                </div>
+                <span className="text-xs bg-green-100 text-green-700 font-medium px-2 py-0.5 rounded-full shrink-0">Bevestigd</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Kalender preview mockup */}
-      <section className="max-w-4xl mx-auto px-4 -mt-10 mb-16">
-        <div className="bg-white rounded-2xl shadow-xl border border-warm-100 overflow-hidden">
-          <div className="bg-warm-50 border-b border-warm-100 px-6 py-4 flex items-center justify-between">
-            <span className="font-semibold text-warm-900">Chalet de Ardennen — Mei 2026</span>
-            <div className="flex gap-4 text-xs text-warm-500">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-red-200 inline-block" />Bezet</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-200 inline-block" />Optie</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-green-100 border border-green-200 inline-block" />Vrij</span>
+      {/* Hoe het werkt */}
+      <section id="hoe-het-werkt" className="max-w-5xl mx-auto px-4 pt-24 pb-16">
+        <div className="text-center mb-12">
+          <span className="text-xs font-semibold text-accent uppercase tracking-widest">In 3 stappen</span>
+          <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-3">Van aanmelden tot live kalender</h2>
+          <p className="text-warm-500 max-w-lg mx-auto">Geen handleiding nodig. Je kalender staat online nog voor je koffie klaar is.</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-8 relative">
+          {/* Connecting line desktop */}
+          <div className="hidden md:block absolute top-8 left-1/3 right-1/3 h-0.5 bg-warm-100" />
+          {[
+            {
+              stap: "1",
+              titel: "Account aanmaken",
+              tekst: "Registreer gratis — enkel je e-mailadres nodig. Geen betaalkaart, geen verplichtingen.",
+              kleur: "bg-accent text-white",
+            },
+            {
+              stap: "2",
+              titel: "Kalender instellen",
+              tekst: "Voeg je woning toe, geef haar een naam en kleur. Boekingen invoeren gaat met twee klikken.",
+              kleur: "bg-accent text-white",
+            },
+            {
+              stap: "3",
+              titel: "Delen en synchroniseren",
+              tekst: "Embed de kalender op je website of deel een link. Koppel Airbnb of Booking.com via iCal.",
+              kleur: "bg-accent text-white",
+            },
+          ].map((s) => (
+            <div key={s.stap} className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-2xl ${s.kleur} flex items-center justify-center text-2xl font-extrabold mb-5 shadow-md`}>
+                {s.stap}
+              </div>
+              <h3 className="font-bold text-warm-900 text-lg mb-2">{s.titel}</h3>
+              <p className="text-warm-500 text-sm leading-relaxed">{s.tekst}</p>
             </div>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map((d) => (
-                <div key={d} className="text-xs text-warm-400 font-medium py-1">{d}</div>
-              ))}
-              {[...Array(3)].map((_, i) => <div key={`e${i}`} />)}
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                const bezet = [1,2,3,4,5,6,7,8,16,17,18,19,20,21,22,29,30,31].includes(day);
-                const optie = [13,14,15].includes(day);
-                return (
-                  <div
-                    key={day}
-                    className={`py-2 rounded-lg text-sm font-medium ${
-                      bezet ? "bg-red-100 text-red-700" :
-                      optie ? "bg-amber-100 text-amber-700" :
-                      "text-warm-600 bg-green-50"
-                    }`}
-                  >
-                    {day}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          ))}
+        </div>
+        <div className="text-center mt-10">
+          <Link href="/aanmelden" className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white font-bold px-8 py-3.5 rounded-xl transition-colors">
+            Nu starten
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </Link>
         </div>
       </section>
 
       {/* Features */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
+      <section className="bg-warm-50 py-16 px-4">
+        <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-warm-900 mb-3">Alles wat je nodig hebt</h2>
+          <span className="text-xs font-semibold text-accent uppercase tracking-widest">Functies</span>
+          <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-3">Alles wat je nodig hebt</h2>
           <p className="text-warm-500 max-w-xl mx-auto">
-            Geen ingewikkeld systeem. Gewoon een kalender die werkt, waar je ook bent.
+            Van gratis basisbeheer tot volledige automatisering. Kies wat bij jou past.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -318,6 +397,7 @@ export default function HomePage() {
               <p className="text-sm text-warm-500 leading-relaxed">{f.tekst}</p>
             </div>
           ))}
+        </div>
         </div>
       </section>
 
@@ -423,15 +503,22 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-4 text-center">
-        <div className="max-w-xl mx-auto">
-          <h2 className="text-3xl font-bold text-warm-900 mb-4">Klaar om te starten?</h2>
-          <p className="text-warm-500 mb-8">
-            Maak je gratis account aan en heb je eerste kalender in minder dan 2 minuten klaar.
+      <section className="py-20 px-4">
+        <div className="max-w-3xl mx-auto bg-gradient-to-br from-warm-900 to-accent rounded-3xl px-8 py-14 text-center text-white shadow-xl">
+          <div className="text-4xl mb-4">📅</div>
+          <h2 className="text-3xl font-extrabold mb-4">Klaar om te starten?</h2>
+          <p className="text-white/75 mb-8 text-lg max-w-xl mx-auto">
+            Je eerste kalender staat in minder dan 2 minuten online. Gratis, zonder creditcard.
           </p>
-          <Link href="/aanmelden" className="bg-accent hover:bg-accent-hover text-white font-bold px-10 py-4 rounded-xl transition-colors text-base inline-block">
-            Gratis account aanmaken
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/aanmelden" className="bg-white text-accent font-bold px-10 py-4 rounded-xl hover:bg-warm-50 transition-colors text-base shadow-md">
+              Gratis account aanmaken
+            </Link>
+            <Link href="/prijzen" className="border border-white/30 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors text-base">
+              Bekijk plannen
+            </Link>
+          </div>
+          <p className="text-white/40 text-sm mt-6">Geen creditcard. Geen verplichtingen. Wanneer je wil upgraden, doe je dat gewoon.</p>
         </div>
       </section>
     </>
