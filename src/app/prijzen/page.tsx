@@ -94,7 +94,7 @@ export default function PrijzenPage() {
             <div>
               <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-2">Online beschikbaarheid</p>
               <ul className="space-y-2">
-                {["Onbeperkt kalenders", "Embed op je website", "iCal URL", "Beschikbaarheid delen via link", "Boekingen synchroniseren"].map(f => (
+                {["Onbeperkt kalenders", "Embed op je website", "iCal URL exporteren", "iCal importeren (Airbnb, Booking.com...)", "Beschikbaarheid delen via link"].map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-warm-700">{check}{f}</li>
                 ))}
               </ul>
@@ -136,7 +136,7 @@ export default function PrijzenPage() {
             <div>
               <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-2">Online beschikbaarheid</p>
               <ul className="space-y-2">
-                {["Embed op je website", "iCal URL", "Beschikbaarheid delen", "Boekingen synchroniseren", "E-mails versturen"].map(f => (
+                {["Embed op je website", "iCal URL exporteren", "iCal importeren", "Beschikbaarheid delen via link", "E-mails versturen"].map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-warm-700">{check}{f}</li>
                 ))}
               </ul>

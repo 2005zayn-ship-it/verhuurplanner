@@ -91,7 +91,7 @@ const plans = [
       "Gastnaam per periode",
       "Notities per boeking",
       "Embed op je website",
-      "iCal URL (Google Agenda, Outlook, Apple)",
+      "iCal URL exporteren (Google Agenda, Outlook, Apple)",
     ],
     nee: ["iCal importeren (Airbnb, Booking.com...)", "Meerdere kalenders", "Betalingen ontvangen"],
     cta: "Gratis starten",
