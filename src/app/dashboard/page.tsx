@@ -112,6 +112,13 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {/* Feedback link */}
+      <div className="mt-8 text-center">
+        <Link href="/dashboard/feedback" className="text-sm text-warm-400 hover:text-accent transition-colors">
+          Feedback of suggestie? Laat het ons weten →
+        </Link>
+      </div>
+
       {/* Cross-promo vakantiewoningen-in-belgie.be */}
       <div className="mt-10 bg-gradient-to-br from-warm-800 to-accent rounded-2xl p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-5">
         <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
