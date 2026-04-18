@@ -22,7 +22,7 @@ export default function PrijzenPage() {
             prijs: "Gratis",
             periode: "",
             desc: "Voor verhuurders die starten.",
-            features: ["1 kalender", "Beschikbaarheid (bezet/vrij/optie)", "Gastnaam per periode", "Notities per boeking", "Embed op je website"],
+            features: ["1 kalender", "Beschikbaarheid (bezet/vrij/optie)", "Gastnaam per periode", "Notities per boeking", "Embed op je website", "iCal URL (Google Agenda, Outlook, Apple)"],
             cta: "Gratis starten",
             href: "/aanmelden",
             highlight: false,
