@@ -328,9 +328,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-warm-900 mt-2 mb-3">Van aanmelden tot live kalender</h2>
           <p className="text-warm-500 max-w-lg mx-auto">Geen handleiding nodig. Je kalender staat online nog voor je koffie klaar is.</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8 relative">
-          {/* Connecting line desktop */}
-          <div className="hidden md:block absolute top-8 left-1/3 right-1/3 h-0.5 bg-warm-100" />
+        <div className="grid md:grid-cols-3 gap-8">
           {[
             {
               stap: "1",
