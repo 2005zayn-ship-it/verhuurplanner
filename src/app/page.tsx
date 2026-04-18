@@ -290,6 +290,48 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Veiligheid */}
+      <section className="bg-warm-50 py-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-warm-900 mb-3">Veiligheid voorop</h2>
+            <p className="text-warm-500 max-w-lg mx-auto">Jouw gegevens en die van je gasten zijn veilig bij ons. Alles is versleuteld, opgeslagen in de EU en strikt privé.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+                titel: "SSL-versleuteling",
+                tekst: "Alle gegevens worden versleuteld verzonden via HTTPS. Geen enkel gegeven gaat over het net zonder beveiliging.",
+              },
+              {
+                icon: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>,
+                titel: "Opslag in de EU",
+                tekst: "Je data wordt opgeslagen op servers binnen de Europese Unie, conform de AVG/GDPR.",
+              },
+              {
+                icon: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+                titel: "Privé gastgegevens",
+                tekst: "Gastnames en notities zijn enkel zichtbaar voor jou. De publieke kalender toont alleen beschikbaarheid.",
+              },
+              {
+                icon: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
+                titel: "AVG/GDPR-conform",
+                tekst: "We verwerken enkel de gegevens die noodzakelijk zijn voor de dienst en delen ze nooit voor commerciële doeleinden.",
+              },
+            ].map((item) => (
+              <div key={item.titel} className="bg-white rounded-2xl border border-warm-100 p-6 shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center text-accent mb-4">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{item.icon}</svg>
+                </div>
+                <h3 className="font-semibold text-warm-900 mb-2">{item.titel}</h3>
+                <p className="text-sm text-warm-500 leading-relaxed">{item.tekst}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-20 px-4 text-center">
         <div className="max-w-xl mx-auto">
