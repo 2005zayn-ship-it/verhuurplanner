@@ -7,9 +7,15 @@ import { nl } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { Calendar, Booking, BookingStatus } from "@/lib/types";
 
+interface IcalImport {
+  url: string;
+  naam: string;
+}
+
 interface Props {
   calendar: Calendar;
   initialBookings: Booking[];
+  initialIcalImports: IcalImport[];
 }
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -24,7 +30,7 @@ const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; dot: stri
   geblokkeerd: { bg: "bg-warm-100", text: "text-warm-500", dot: "bg-warm-400" },
 };
 
-export default function KalenderClient({ calendar, initialBookings }: Props) {
+export default function KalenderClient({ calendar, initialBookings, initialIcalImports }: Props) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectStart, setSelectStart] = useState<Date | null>(null);
@@ -37,11 +43,21 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
   const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
   const [copied, setCopied] = useState(false);
   const [copiedIcal, setCopiedIcal] = useState(false);
+  const [copiedBeschikbaarheid, setCopiedBeschikbaarheid] = useState(false);
+
+  // iCal import state
+  const [icalImports, setIcalImports] = useState<IcalImport[]>(initialIcalImports);
+  const [importNaam, setImportNaam] = useState("");
+  const [importUrl, setImportUrl] = useState("");
+  const [isSavingImport, setIsSavingImport] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; errors: string[] } | null>(null);
 
   const embedCode = `<script src="https://www.verhuurplanner.be/embed/${calendar.public_token}.js" async></script>
 <div id="verhuurplanner-${calendar.public_token}"></div>`;
 
   const icalUrl = `https://www.verhuurplanner.be/api/ical/${calendar.public_token}.ics`;
+  const beschikbaarheidUrl = `https://www.verhuurplanner.be/beschikbaarheid/${calendar.public_token}`;
 
   function getBookingsForDay(date: Date): Booking[] {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -156,6 +172,66 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
     setTimeout(() => setCopiedIcal(false), 2000);
   }
 
+  function copyBeschikbaarheid() {
+    navigator.clipboard.writeText(beschikbaarheidUrl);
+    setCopiedBeschikbaarheid(true);
+    setTimeout(() => setCopiedBeschikbaarheid(false), 2000);
+  }
+
+  async function handleAddImport() {
+    if (!importNaam.trim() || !importUrl.trim()) return;
+    setIsSavingImport(true);
+    const newImports = [...icalImports, { naam: importNaam.trim(), url: importUrl.trim() }];
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("calendars")
+      .update({ ical_import_urls: newImports })
+      .eq("id", calendar.id);
+    if (!error) {
+      setIcalImports(newImports);
+      setImportNaam("");
+      setImportUrl("");
+      setSyncResult(null);
+    }
+    setIsSavingImport(false);
+  }
+
+  async function handleDeleteImport(index: number) {
+    const newImports = icalImports.filter((_, i) => i !== index);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("calendars")
+      .update({ ical_import_urls: newImports })
+      .eq("id", calendar.id);
+    if (!error) {
+      setIcalImports(newImports);
+      setSyncResult(null);
+    }
+  }
+
+  async function handleSync() {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`/api/ical-import/${calendar.id}`, { method: "POST" });
+      const data = await res.json();
+      setSyncResult(data);
+      if (data.synced > 0) {
+        // Refresh bookings from Supabase
+        const supabase = createClient();
+        const { data: refreshed } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("calendar_id", calendar.id)
+          .order("start_datum", { ascending: true });
+        if (refreshed) setBookings(refreshed);
+      }
+    } catch {
+      setSyncResult({ synced: 0, errors: ["Verbindingsfout. Probeer het opnieuw."] });
+    }
+    setIsSyncing(false);
+  }
+
   // Build calendar grid
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -193,7 +269,7 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
             Embed code
           </button>
           <button onClick={() => setActiveTab("ical")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "ical" ? "bg-white text-warm-900 shadow-sm" : "text-warm-500 hover:text-warm-700"}`}>
-            iCal URL
+            Delen &amp; synchroniseren
           </button>
         </div>
       </div>
@@ -340,40 +416,180 @@ export default function KalenderClient({ calendar, initialBookings }: Props) {
       )}
 
       {activeTab === "ical" && (
-        <div className="bg-white rounded-2xl border border-warm-100 shadow-sm p-8">
-          <h2 className="text-lg font-semibold text-warm-900 mb-2">iCal URL</h2>
-          <p className="text-warm-500 text-sm mb-6">
-            Gebruik deze link om jouw kalender te synchroniseren met Google Agenda, Outlook, Apple Kalender of andere boekingssystemen. Elke wijziging in je kalender wordt automatisch doorgegeven.
-          </p>
+        <div className="bg-white rounded-2xl border border-warm-100 shadow-sm p-8 space-y-8">
 
-          <div className="bg-warm-900 rounded-xl p-4 mb-4 relative">
-            <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">
-              {icalUrl}
-            </pre>
-            <button
-              onClick={copyIcal}
-              className="absolute top-3 right-3 bg-warm-700 hover:bg-warm-600 text-warm-200 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+          {/* Section 1: Beschikbaarheid delen */}
+          <div>
+            <h2 className="text-lg font-semibold text-warm-900 mb-1">Beschikbaarheid delen</h2>
+            <p className="text-warm-500 text-sm mb-4">
+              Deel deze link met gasten of eigenaren om je beschikbaarheid te tonen.
+            </p>
+            <div className="bg-warm-900 rounded-xl p-4 mb-3 relative">
+              <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed pr-24">
+                {beschikbaarheidUrl}
+              </pre>
+              <button
+                onClick={copyBeschikbaarheid}
+                className="absolute top-3 right-3 bg-warm-700 hover:bg-warm-600 text-warm-200 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {copiedBeschikbaarheid ? (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>Gekopieerd</>
+                ) : (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Kopiëren</>
+                )}
+              </button>
+            </div>
+            <a
+              href={beschikbaarheidUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
             >
-              {copiedIcal ? (
-                <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>Gekopieerd</>
-              ) : (
-                <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Kopiëren</>
-              )}
-            </button>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              Pagina bekijken
+            </a>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              { name: "Google Agenda", hint: "Andere agenda's > Via URL" },
-              { name: "Outlook", hint: "Agenda toevoegen > Via internet" },
-              { name: "Apple Kalender", hint: "Archief > Abonneren..." },
-            ].map(({ name, hint }) => (
-              <div key={name} className="bg-warm-50 border border-warm-100 rounded-xl p-3 text-xs text-warm-600">
-                <p className="font-semibold text-warm-800 mb-0.5">{name}</p>
-                <p className="text-warm-400">{hint}</p>
-              </div>
-            ))}
+          {/* Divider */}
+          <div className="border-t border-warm-100" />
+
+          {/* Section 2: iCal exporteren */}
+          <div>
+            <h2 className="text-lg font-semibold text-warm-900 mb-1">iCal exporteren</h2>
+            <p className="text-warm-500 text-sm mb-4">
+              Gebruik deze link om jouw kalender te synchroniseren met Google Agenda, Outlook, Apple Kalender of andere boekingssystemen. Elke wijziging in je kalender wordt automatisch doorgegeven.
+            </p>
+
+            <div className="bg-warm-900 rounded-xl p-4 mb-4 relative">
+              <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed pr-24">
+                {icalUrl}
+              </pre>
+              <button
+                onClick={copyIcal}
+                className="absolute top-3 right-3 bg-warm-700 hover:bg-warm-600 text-warm-200 text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {copiedIcal ? (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>Gekopieerd</>
+                ) : (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Kopiëren</>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { name: "Google Agenda", hint: "Andere agenda's > Via URL" },
+                { name: "Outlook", hint: "Agenda toevoegen > Via internet" },
+                { name: "Apple Kalender", hint: "Archief > Abonneren..." },
+              ].map(({ name, hint }) => (
+                <div key={name} className="bg-warm-50 border border-warm-100 rounded-xl p-3 text-xs text-warm-600">
+                  <p className="font-semibold text-warm-800 mb-0.5">{name}</p>
+                  <p className="text-warm-400">{hint}</p>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-warm-100" />
+
+          {/* Section 3: Externe kalenders importeren */}
+          <div>
+            <h2 className="text-lg font-semibold text-warm-900 mb-1">Externe kalenders importeren</h2>
+            <p className="text-warm-500 text-sm mb-5">
+              Voeg iCal-links toe van Airbnb, Booking.com of andere platforms. Geïmporteerde periodes worden als geblokkeerd gemarkeerd in je kalender.
+            </p>
+
+            {/* Existing import URLs */}
+            {icalImports.length > 0 && (
+              <div className="space-y-2 mb-5">
+                {icalImports.map((imp, index) => (
+                  <div key={index} className="flex items-center gap-3 bg-warm-50 border border-warm-100 rounded-xl px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-warm-800 truncate">{imp.naam}</p>
+                      <p className="text-xs text-warm-400 truncate">{imp.url}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteImport(index)}
+                      className="shrink-0 text-warm-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+                      aria-label={`${imp.naam} verwijderen`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add import URL form */}
+            <div className="bg-warm-50 border border-warm-100 rounded-xl p-4 mb-5">
+              <p className="text-sm font-medium text-warm-700 mb-3">URL toevoegen</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <input
+                  type="text"
+                  value={importNaam}
+                  onChange={e => setImportNaam(e.target.value)}
+                  placeholder="Naam (bijv. Airbnb)"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                />
+                <input
+                  type="url"
+                  value={importUrl}
+                  onChange={e => setImportUrl(e.target.value)}
+                  placeholder="https://www.airbnb.be/calendar/ical/..."
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                />
+              </div>
+              <button
+                onClick={handleAddImport}
+                disabled={isSavingImport || !importNaam.trim() || !importUrl.trim()}
+                className="bg-accent hover:bg-accent-hover text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSavingImport ? (
+                  "Opslaan..."
+                ) : (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Toevoegen</>
+                )}
+              </button>
+            </div>
+
+            {/* Sync button + result */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <button
+                onClick={handleSync}
+                disabled={isSyncing || icalImports.length === 0}
+                className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSyncing ? (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>Synchroniseren...</>
+                ) : (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>Nu synchroniseren</>
+                )}
+              </button>
+
+              {syncResult && (
+                <div className={`text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 ${
+                  syncResult.errors.length > 0 ? "bg-amber-50 border border-amber-200 text-amber-700" : "bg-green-50 border border-green-200 text-green-700"
+                }`}>
+                  {syncResult.errors.length === 0 ? (
+                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>
+                    {syncResult.synced} {syncResult.synced === 1 ? "boeking" : "boekingen"} gesynchroniseerd</>
+                  ) : (
+                    <span>
+                      {syncResult.synced > 0 && `${syncResult.synced} gesynchroniseerd. `}
+                      Fouten: {syncResult.errors.join(", ")}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       )}
 

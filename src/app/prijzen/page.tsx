@@ -50,10 +50,10 @@ export default function PrijzenPage() {
             <div>
               <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-2">Online beschikbaarheid</p>
               <ul className="space-y-2">
-                {["Embed op je website", "iCal URL (Google Agenda, Outlook, Apple)"].map(f => (
+                {["Embed op je website", "iCal URL exporteren (Google Agenda, Outlook, Apple)"].map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-warm-700">{check}{f}</li>
                 ))}
-                {["Boekingen synchroniseren", "Meerdere kalenders"].map(f => (
+                {["iCal importeren (Airbnb, Booking.com...)", "Beschikbaarheid delen via link"].map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-warm-300">{cross}{f}</li>
                 ))}
               </ul>
@@ -80,7 +80,7 @@ export default function PrijzenPage() {
             <span className="text-3xl font-extrabold text-warm-900">€9</span>
             <span className="text-warm-400 text-sm">/maand</span>
           </div>
-          <p className="text-sm text-warm-500 mb-6">Meer kalenders, onbeperkte boekingen.</p>
+          <p className="text-sm text-warm-500 mb-6">Onbeperkt kalenders, onbeperkte boekingen.</p>
 
           <div className="space-y-4 flex-1 mb-8">
             <div>

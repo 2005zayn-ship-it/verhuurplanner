@@ -31,5 +31,11 @@ export default async function KalenderPage({ params }: { params: Promise<{ id: s
     .eq("calendar_id", id)
     .order("start_datum", { ascending: true });
 
-  return <KalenderClient calendar={calendar} initialBookings={bookings || []} />;
+  return (
+    <KalenderClient
+      calendar={calendar}
+      initialBookings={bookings || []}
+      initialIcalImports={calendar.ical_import_urls ?? []}
+    />
+  );
 }

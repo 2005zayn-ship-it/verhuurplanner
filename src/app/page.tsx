@@ -93,7 +93,7 @@ const plans = [
       "Embed op je website",
       "iCal URL (Google Agenda, Outlook, Apple)",
     ],
-    nee: ["Onbeperkte boekingen", "Meerdere kalenders", "Betalingen ontvangen"],
+    nee: ["iCal importeren (Airbnb, Booking.com...)", "Meerdere kalenders", "Betalingen ontvangen"],
     cta: "Gratis starten",
     href: "/aanmelden",
     accent: false,
@@ -103,7 +103,7 @@ const plans = [
     naam: "Lite",
     prijs: "€9",
     periode: "/maand",
-    beschrijving: "Meer kalenders, onbeperkte boekingen.",
+    beschrijving: "Onbeperkt kalenders, onbeperkte boekingen.",
     kenmerken: [
       "Onbeperkt kalenders",
       "Onbeperkt boekingen",

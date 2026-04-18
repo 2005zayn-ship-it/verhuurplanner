@@ -19,6 +19,7 @@ export interface Calendar {
   kleur: string;
   public_token: string;
   created_at: string;
+  ical_import_urls?: { url: string; naam: string }[];
 }
 
 export interface Booking {
