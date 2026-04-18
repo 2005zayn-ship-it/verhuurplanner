@@ -111,6 +111,30 @@ export default async function DashboardPage() {
           ))}
         </div>
       )}
+
+      {/* Cross-promo vakantiewoningen-in-belgie.be */}
+      <div className="mt-10 bg-gradient-to-br from-warm-800 to-accent rounded-2xl p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <p className="font-semibold text-base">Verhuur je een vakantiewoning of B&amp;B in België?</p>
+          <p className="text-white/70 text-sm mt-1">
+            Zet je woning gratis op vakantiewoningen-in-belgie.be en bereik duizenden vakantiegangers. De eerste 100 woningen zijn een volledig jaar gratis.
+          </p>
+        </div>
+        <a
+          href="https://www.vakantiewoningen-in-belgie.be/aanmelden"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 bg-white text-accent font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-warm-50 transition-colors whitespace-nowrap"
+        >
+          Woning plaatsen →
+        </a>
+      </div>
     </div>
   );
 }
