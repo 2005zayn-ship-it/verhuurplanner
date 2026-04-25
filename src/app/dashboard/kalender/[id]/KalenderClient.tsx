@@ -114,6 +114,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     notities: "",
     priveNotities: "",
     bron: "",
+    facturatiePrijs: "",
   });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
@@ -124,6 +125,13 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [zoekOpen, setZoekOpen] = useState(false);
   const [toonMeerReservaties, setToonMeerReservaties] = useState(false);
   const [jaaroverzichtOpen, setJaaroverzichtOpen] = useState(false);
+  const [hoveredTooltip, setHoveredTooltip] = useState<{
+    booking: Booking;
+    top: number;
+    left: number;
+    above: boolean;
+  } | null>(null);
+  const tooltipHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // iCal import state
   const [icalImports, setIcalImports] = useState<IcalImport[]>(initialIcalImports);
@@ -198,6 +206,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         notities: b.notities || "",
         priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
         bron: b.bron || "",
+        facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
       });
       setModal("edit");
       return;
@@ -214,7 +223,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       setSelectStart(actualStart);
       setSelectEnd(actualEnd);
       setSelecting(false);
-      setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "" });
+      setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "", facturatiePrijs: "" });
       setModal("new");
     }
   }
@@ -247,6 +256,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         notities: formData.notities || null,
         prive_notities: formData.priveNotities || null,
         bron: formData.bron || null,
+        facturatie_prijs: formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null,
       })
       .select()
       .single();
@@ -269,6 +279,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         notities: formData.notities || null,
         prive_notities: formData.priveNotities || null,
         bron: formData.bron || null,
+        facturatie_prijs: formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null,
       })
       .eq("id", editingBooking.id);
     if (!error) {
@@ -650,7 +661,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 setSelecting(false);
                 setSelectStart(new Date());
                 setSelectEnd(new Date());
-                setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "" });
+                setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "", facturatiePrijs: "" });
                 setModal("new");
               }}
               className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors"
@@ -690,6 +701,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                             notities: b.notities || "",
                             priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
                             bron: b.bron || "",
+                            facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
                           });
                           setModal("edit");
                           setZoekOpen(false);
@@ -825,6 +837,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                               notities: b.notities || "",
                               priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
                               bron: b.bron || "",
+                              facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
                             });
                             setModal("edit");
                           }}
@@ -1181,6 +1194,31 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
+              {/* Prijsopbouw */}
+              <div className="pt-2 border-t border-warm-100">
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Huurprijs per nacht (optioneel)</label>
+                <div className="relative max-w-[160px]">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={formData.facturatiePrijs}
+                    onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
+                    placeholder="—"
+                    className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+                {formData.facturatiePrijs && selectStart && selectEnd && (() => {
+                  const nachten = Math.round((selectEnd.getTime() - selectStart.getTime()) / (1000 * 60 * 60 * 24));
+                  const totaal = Number(formData.facturatiePrijs) * nachten;
+                  return (
+                    <p className="text-xs text-warm-500 mt-1.5">
+                      {nachten} nacht{nachten !== 1 ? "en" : ""} × €{formData.facturatiePrijs} = <span className="font-semibold text-warm-800">€{totaal.toFixed(2)}</span>
+                    </p>
+                  );
+                })()}
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={cancelModal} className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-xl text-sm hover:bg-warm-50 transition-colors">
@@ -1262,6 +1300,38 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 >
                   {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+              </div>
+              {/* Prijsopbouw */}
+              <div className="pt-2 border-t border-warm-100">
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Huurprijs per nacht (optioneel)</label>
+                <div className="relative max-w-[160px]">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={formData.facturatiePrijs}
+                    onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
+                    placeholder="—"
+                    className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+                {(() => {
+                  const nachten = Math.round(
+                    (new Date(editingBooking.eind_datum).getTime() - new Date(editingBooking.start_datum).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  const prijs = formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null;
+                  return (
+                    <p className="text-xs text-warm-500 mt-1.5">
+                      {nachten} nacht{nachten !== 1 ? "en" : ""}
+                      {prijs != null ? (
+                        <> × €{prijs} = <span className="font-semibold text-warm-800">€{(prijs * nachten).toFixed(2)}</span></>
+                      ) : (
+                        <span className="text-warm-300"> — geen prijs ingevuld</span>
+                      )}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
             <div className="flex gap-3 mt-6">
