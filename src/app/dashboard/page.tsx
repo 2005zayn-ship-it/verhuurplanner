@@ -45,7 +45,7 @@ export default async function DashboardPage() {
       <div className="bg-accent-light rounded-xl px-4 py-3 flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-accent uppercase tracking-wider">
-            {profile?.plan?.toUpperCase() ?? "BASIC"} plan
+            {({ basic: "FREE", premium: "LITE", gold: "PRO" } as Record<string, string>)[profile?.plan ?? "basic"] ?? "FREE"} PLAN
           </span>
           {profile?.payment_status === "onbetaald" && profile?.plan !== "basic" && (
             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Betaling vereist</span>

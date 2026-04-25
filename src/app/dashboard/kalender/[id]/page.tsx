@@ -31,11 +31,18 @@ export default async function KalenderPage({ params }: { params: Promise<{ id: s
     .eq("calendar_id", id)
     .order("start_datum", { ascending: true });
 
+  const { data: allCalendars } = await supabase
+    .from("calendars")
+    .select("id, naam, kleur")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
   return (
     <KalenderClient
       calendar={calendar}
       initialBookings={bookings || []}
       initialIcalImports={calendar.ical_import_urls ?? []}
+      allCalendars={allCalendars ?? []}
     />
   );
 }

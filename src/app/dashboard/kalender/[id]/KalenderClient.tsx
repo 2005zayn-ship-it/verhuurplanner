@@ -1,8 +1,26 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, isWithinInterval, parseISO, addMonths, subMonths, isBefore, isAfter } from "date-fns";
+import { useRouter } from "next/navigation";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  getDay,
+  isWithinInterval,
+  parseISO,
+  addMonths,
+  subMonths,
+  isBefore,
+  isToday,
+  isPast,
+  startOfWeek,
+  endOfWeek,
+  eachWeekOfInterval,
+  getISOWeek,
+} from "date-fns";
 import { nl } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { Calendar, Booking, BookingStatus } from "@/lib/types";
@@ -16,6 +34,7 @@ interface Props {
   calendar: Calendar;
   initialBookings: Booking[];
   initialIcalImports: IcalImport[];
+  allCalendars: { id: string; naam: string; kleur: string }[];
 }
 
 const BRON_OPTIONS: { value: string; label: string }[] = [
@@ -48,26 +67,48 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   geblokkeerd: "Geblokkeerd",
 };
 
+// Inline style colors for diagonal split rendering
+const STATUS_HEX: Record<BookingStatus, string> = {
+  bezet: "#f07e6f",
+  optie: "#f59e0b",
+  geblokkeerd: "#9ca3af",
+};
+
 const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; dot: string }> = {
   bezet: { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-400" },
   optie: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-400" },
   geblokkeerd: { bg: "bg-warm-100", text: "text-warm-500", dot: "bg-warm-400" },
 };
 
-export default function KalenderClient({ calendar, initialBookings, initialIcalImports }: Props) {
+const AANTALMAANDEN_OPTIONS = [1, 2, 3, 4, 5, 6, 12];
+
+export default function KalenderClient({ calendar, initialBookings, initialIcalImports, allCalendars }: Props) {
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
+  const [aantalMaanden, setAantalMaanden] = useState(3);
   const [selectStart, setSelectStart] = useState<Date | null>(null);
   const [selectEnd, setSelectEnd] = useState<Date | null>(null);
   const [selecting, setSelecting] = useState(false);
+  const [hoverDate, setHoverDate] = useState<Date | null>(null);
   const [modal, setModal] = useState<"new" | "edit" | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [formData, setFormData] = useState({ gastNaam: "", status: "bezet" as BookingStatus, notities: "", bron: "" });
+  const [formData, setFormData] = useState({
+    gastNaam: "",
+    status: "bezet" as BookingStatus,
+    notities: "",
+    priveNotities: "",
+    bron: "",
+  });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
   const [copied, setCopied] = useState(false);
   const [copiedIcal, setCopiedIcal] = useState(false);
   const [copiedBeschikbaarheid, setCopiedBeschikbaarheid] = useState(false);
+  const [zoekQuery, setZoekQuery] = useState("");
+  const [zoekOpen, setZoekOpen] = useState(false);
+  const [toonMeerReservaties, setToonMeerReservaties] = useState(false);
+  const [jaaroverzichtOpen, setJaaroverzichtOpen] = useState(false);
 
   // iCal import state
   const [icalImports, setIcalImports] = useState<IcalImport[]>(initialIcalImports);
@@ -77,42 +118,94 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; errors: string[] } | null>(null);
 
-  const embedCode = `<script src="https://www.verhuurplanner.be/embed/${calendar.public_token}.js" async></script>
-<div id="verhuurplanner-${calendar.public_token}"></div>`;
+  // Cleanup timeouts
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedIcalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedBeschikbaarheidTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      if (copiedIcalTimerRef.current) clearTimeout(copiedIcalTimerRef.current);
+      if (copiedBeschikbaarheidTimerRef.current) clearTimeout(copiedBeschikbaarheidTimerRef.current);
+    };
+  }, []);
+
+  const embedCode = `<script src="https://www.verhuurplanner.be/embed/${calendar.public_token}.js" async></script>\n<div id="verhuurplanner-${calendar.public_token}"></div>`;
   const icalUrl = `https://www.verhuurplanner.be/api/ical/${calendar.public_token}.ics`;
   const beschikbaarheidUrl = `https://www.verhuurplanner.be/beschikbaarheid/${calendar.public_token}`;
 
-  function getBookingsForDay(date: Date): Booking[] {
-    const dateStr = format(date, "yyyy-MM-dd");
+  // --- Helper: get booking(s) for a day ---
+  function getBookingsForDay(dateStr: string): Booking[] {
     return bookings.filter(b => dateStr >= b.start_datum && dateStr <= b.eind_datum);
   }
 
+  // --- Day cell style calculation ---
+  function getDayCellStyle(
+    dateStr: string,
+    arrivalBooking: Booking | null,
+    departureBooking: Booking | null,
+    fullBooking: Booking | null
+  ): React.CSSProperties {
+    if (fullBooking && !arrivalBooking && !departureBooking) {
+      return { backgroundColor: STATUS_HEX[fullBooking.status] };
+    }
+    if (arrivalBooking && departureBooking) {
+      // Changeover: departure bottom-left, arrival top-right
+      const depColor = STATUS_HEX[departureBooking.status];
+      const arrColor = STATUS_HEX[arrivalBooking.status];
+      return { background: `linear-gradient(to top left, ${depColor} 50%, ${arrColor} 50%)` };
+    }
+    if (arrivalBooking) {
+      // Arrival: top-right half colored
+      const color = STATUS_HEX[arrivalBooking.status];
+      return { background: `linear-gradient(to top left, ${color} 50%, transparent 50%)` };
+    }
+    if (departureBooking) {
+      // Departure: bottom-left half colored
+      const color = STATUS_HEX[departureBooking.status];
+      return { background: `linear-gradient(to top left, transparent 50%, ${color} 50%)` };
+    }
+    return {};
+  }
+
+  // --- Booking interaction ---
   function handleDayClick(date: Date) {
-    const dayBookings = getBookingsForDay(date);
+    const dateStr = format(date, "yyyy-MM-dd");
+    const dayBookings = getBookingsForDay(dateStr);
+
     if (dayBookings.length > 0) {
-      setEditingBooking(dayBookings[0]);
-      setFormData({ gastNaam: dayBookings[0].gast_naam || "", status: dayBookings[0].status, notities: dayBookings[0].notities || "", bron: dayBookings[0].bron || "" });
+      const b = dayBookings[0];
+      setEditingBooking(b);
+      setFormData({
+        gastNaam: b.gast_naam || "",
+        status: b.status,
+        notities: b.notities || "",
+        priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
+        bron: b.bron || "",
+      });
       setModal("edit");
       return;
     }
+
     if (!selecting) {
       setSelectStart(date);
       setSelectEnd(date);
       setSelecting(true);
     } else {
       const start = selectStart!;
-      const end = isBefore(date, start) ? start : date;
       const actualStart = isBefore(date, start) ? date : start;
+      const actualEnd = isBefore(date, start) ? start : date;
       setSelectStart(actualStart);
-      setSelectEnd(end);
+      setSelectEnd(actualEnd);
       setSelecting(false);
-      setFormData({ gastNaam: "", status: "bezet", notities: "", bron: "" });
+      setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "" });
       setModal("new");
     }
   }
 
   function handleDayHover(date: Date) {
+    setHoverDate(date);
     if (selecting && selectStart) {
       setSelectEnd(isBefore(date, selectStart) ? selectStart : date);
     }
@@ -123,6 +216,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     return isWithinInterval(date, { start: selectStart, end: selectEnd });
   }
 
+  // --- CRUD ---
   async function handleSaveNew() {
     if (!selectStart || !selectEnd) return;
     setSaving(true);
@@ -136,6 +230,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         gast_naam: formData.gastNaam || null,
         status: formData.status,
         notities: formData.notities || null,
+        prive_notities: formData.priveNotities || null,
         bron: formData.bron || null,
       })
       .select()
@@ -153,13 +248,29 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const supabase = createClient();
     const { error } = await supabase
       .from("bookings")
-      .update({ gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null, bron: formData.bron || null })
+      .update({
+        gast_naam: formData.gastNaam || null,
+        status: formData.status,
+        notities: formData.notities || null,
+        prive_notities: formData.priveNotities || null,
+        bron: formData.bron || null,
+      })
       .eq("id", editingBooking.id);
     if (!error) {
-      setBookings(prev => prev.map(b => b.id === editingBooking.id
-        ? { ...b, gast_naam: formData.gastNaam || null, status: formData.status, notities: formData.notities || null, bron: (formData.bron || null) as import("@/lib/types").BookingBron }
-        : b
-      ));
+      setBookings(prev =>
+        prev.map(b =>
+          b.id === editingBooking.id
+            ? {
+                ...b,
+                gast_naam: formData.gastNaam || null,
+                status: formData.status,
+                notities: formData.notities || null,
+                prive_notities: formData.priveNotities || null,
+                bron: (formData.bron || null) as import("@/lib/types").BookingBron,
+              }
+            : b
+        )
+      );
     }
     setSaving(false);
     setModal(null);
@@ -185,33 +296,35 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     setSelecting(false);
   }
 
+  // --- Copy helpers ---
   function copyEmbed() {
     navigator.clipboard.writeText(embedCode);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
   }
 
   function copyIcal() {
     navigator.clipboard.writeText(icalUrl);
     setCopiedIcal(true);
-    setTimeout(() => setCopiedIcal(false), 2000);
+    if (copiedIcalTimerRef.current) clearTimeout(copiedIcalTimerRef.current);
+    copiedIcalTimerRef.current = setTimeout(() => setCopiedIcal(false), 2000);
   }
 
   function copyBeschikbaarheid() {
     navigator.clipboard.writeText(beschikbaarheidUrl);
     setCopiedBeschikbaarheid(true);
-    setTimeout(() => setCopiedBeschikbaarheid(false), 2000);
+    if (copiedBeschikbaarheidTimerRef.current) clearTimeout(copiedBeschikbaarheidTimerRef.current);
+    copiedBeschikbaarheidTimerRef.current = setTimeout(() => setCopiedBeschikbaarheid(false), 2000);
   }
 
+  // --- iCal import ---
   async function handleAddImport() {
     if (!importNaam.trim() || !importUrl.trim()) return;
     setIsSavingImport(true);
     const newImports = [...icalImports, { naam: importNaam.trim(), url: importUrl.trim() }];
     const supabase = createClient();
-    const { error } = await supabase
-      .from("calendars")
-      .update({ ical_import_urls: newImports })
-      .eq("id", calendar.id);
+    const { error } = await supabase.from("calendars").update({ ical_import_urls: newImports }).eq("id", calendar.id);
     if (!error) {
       setIcalImports(newImports);
       setImportNaam("");
@@ -224,10 +337,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   async function handleDeleteImport(index: number) {
     const newImports = icalImports.filter((_, i) => i !== index);
     const supabase = createClient();
-    const { error } = await supabase
-      .from("calendars")
-      .update({ ical_import_urls: newImports })
-      .eq("id", calendar.id);
+    const { error } = await supabase.from("calendars").update({ ical_import_urls: newImports }).eq("id", calendar.id);
     if (!error) {
       setIcalImports(newImports);
       setSyncResult(null);
@@ -242,7 +352,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       const data = await res.json();
       setSyncResult(data);
       if (data.synced > 0) {
-        // Refresh bookings from Supabase
         const supabase = createClient();
         const { data: refreshed } = await supabase
           .from("bookings")
@@ -257,36 +366,192 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     setIsSyncing(false);
   }
 
-  // Build calendar grid
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startPad = (getDay(monthStart) + 6) % 7; // Monday-based
+  // --- Search / filter ---
+  const zoekResultaten = useMemo(() => {
+    if (!zoekQuery.trim()) return [];
+    const q = zoekQuery.toLowerCase();
+    return bookings.filter(b => b.gast_naam?.toLowerCase().includes(q));
+  }, [zoekQuery, bookings]);
+
+  // --- Upcoming bookings ---
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const komende = useMemo(() =>
+    bookings
+      .filter(b => b.eind_datum >= todayStr)
+      .sort((a, b) => a.start_datum.localeCompare(b.start_datum)),
+    [bookings, todayStr]
+  );
+
+  // --- Month range for display ---
+  const months = useMemo(() => {
+    return Array.from({ length: aantalMaanden }, (_, i) => addMonths(startDate, i));
+  }, [startDate, aantalMaanden]);
+
+  // --- Jaaroverzicht months ---
+  const jaarMaanden = useMemo(() => {
+    const jan = startOfMonth(new Date(new Date().getFullYear(), 0, 1));
+    return Array.from({ length: 12 }, (_, i) => addMonths(jan, i));
+  }, []);
+
+  // --- Render a single month block ---
+  function renderMonth(month: Date) {
+    const mStart = startOfMonth(month);
+    const mEnd = endOfMonth(month);
+    const weeks = eachWeekOfInterval(
+      { start: mStart, end: mEnd },
+      { weekStartsOn: 1 }
+    );
+
+    const monthLabel = format(month, "MMMM", { locale: nl });
+    const yearLabel = format(month, "yyyy");
+    const monthNumber = format(month, "MM");
+
+    return (
+      <div key={month.toISOString()} className="flex-1 min-w-0 bg-white border border-warm-100 rounded-2xl overflow-hidden">
+        {/* Month header */}
+        <div className="relative px-3 pt-3 pb-2 border-b border-warm-100 bg-warm-50">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-bold text-warm-900 capitalize">{monthLabel}</span>
+            <span className="text-xs text-warm-400">{yearLabel}</span>
+          </div>
+          {/* Large faded month number top-right */}
+          <span className="absolute top-1 right-3 text-4xl font-black text-warm-100 select-none leading-none pointer-events-none">
+            {monthNumber}
+          </span>
+        </div>
+
+        {/* Day headers + week number column */}
+        <div className="px-2 pt-2">
+          <div className="grid grid-cols-[24px_repeat(7,1fr)] gap-x-0.5 mb-1">
+            <div className="text-center text-[10px] text-warm-300 font-medium py-0.5">W</div>
+            {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
+              <div key={d} className="text-center text-[10px] font-semibold text-warm-400 py-0.5">{d}</div>
+            ))}
+          </div>
+
+          {/* Weeks */}
+          <div className="space-y-0.5 pb-2">
+            {weeks.map(weekStart => {
+              const weekDays = eachDayOfInterval({
+                start: weekStart,
+                end: endOfWeek(weekStart, { weekStartsOn: 1 }),
+              });
+              const weekNum = getISOWeek(weekStart);
+
+              return (
+                <div key={weekStart.toISOString()} className="grid grid-cols-[24px_repeat(7,1fr)] gap-x-0.5">
+                  {/* Week number */}
+                  <div className="flex items-center justify-center text-[10px] text-warm-300 font-medium select-none">
+                    {weekNum}
+                  </div>
+
+                  {/* Days */}
+                  {weekDays.map(day => {
+                    const isCurrentMonth = day.getMonth() === month.getMonth();
+                    const dateStr = format(day, "yyyy-MM-dd");
+                    const dayBookings = getBookingsForDay(dateStr);
+
+                    // Categorize bookings
+                    const fullBookings = dayBookings.filter(
+                      b => dateStr > b.start_datum && dateStr < b.eind_datum
+                    );
+                    const arrivalBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr !== b.eind_datum);
+                    const departureBookings = dayBookings.filter(b => dateStr === b.eind_datum && dateStr !== b.start_datum);
+                    const sameDayBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr === b.eind_datum);
+
+                    const fullBooking = fullBookings[0] ?? sameDayBookings[0] ?? null;
+                    const arrivalBooking = arrivalBookings[0] ?? null;
+                    const departureBooking = departureBookings[0] ?? null;
+                    const hasAnyBooking = dayBookings.length > 0;
+
+                    const inSel = isInSelection(day);
+                    const isTod = isToday(day);
+                    const isPastDay = isPast(day) && !isToday(day);
+
+                    // Highlighted by search
+                    const isHighlighted =
+                      zoekQuery.trim().length > 0 &&
+                      zoekResultaten.some(
+                        b => dateStr >= b.start_datum && dateStr <= b.eind_datum
+                      );
+
+                    const cellStyle = isCurrentMonth
+                      ? getDayCellStyle(dateStr, arrivalBooking, departureBooking, fullBooking)
+                      : {};
+
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        onClick={() => isCurrentMonth && handleDayClick(day)}
+                        onMouseEnter={() => handleDayHover(day)}
+                        onMouseLeave={() => setHoverDate(null)}
+                        className={[
+                          "relative flex items-center justify-center rounded-md text-[11px] font-medium transition-all select-none",
+                          "aspect-square",
+                          isCurrentMonth ? "cursor-pointer" : "cursor-default",
+                          !isCurrentMonth ? "text-warm-200 opacity-30" : "",
+                          isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
+                          isCurrentMonth && !hasAnyBooking && inSel ? "bg-accent/15 text-accent" : "",
+                          isCurrentMonth && hasAnyBooking && !arrivalBooking && !departureBooking ? "text-white" : "",
+                          isCurrentMonth && hasAnyBooking && (arrivalBooking || departureBooking) ? "text-warm-800" : "",
+                          isPastDay && isCurrentMonth ? "opacity-50" : "",
+                          isHighlighted ? "ring-2 ring-accent ring-offset-1 rounded-md" : "",
+                        ].filter(Boolean).join(" ")}
+                        style={isCurrentMonth ? cellStyle : {}}
+                      >
+                        {/* Day number */}
+                        <span className={isTod && isCurrentMonth ? "relative z-10" : ""}>
+                          {format(day, "d")}
+                        </span>
+
+                        {/* Today ring */}
+                        {isTod && isCurrentMonth && (
+                          <span
+                            className="absolute inset-0.5 rounded-md border-2 border-accent pointer-events-none"
+                            style={{ zIndex: 1 }}
+                          />
+                        )}
+
+                        {/* Guest name dot for bookings with name */}
+                        {isCurrentMonth && dayBookings.some(b => b.gast_naam && dateStr === b.start_datum) && (
+                          <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-70 pointer-events-none" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-full mx-auto px-4 py-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-warm-500 mb-6">
-        <Link href="/dashboard" className="hover:text-warm-900 transition-colors">Dashboard</Link>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
-        <span className="text-warm-900 font-medium">{calendar.naam}</span>
+      <div className="flex items-center gap-2 text-sm text-warm-400 mb-5">
+        <Link href="/dashboard" className="hover:text-warm-700 transition-colors">Dashboard</Link>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+        <span className="text-warm-700 font-medium">{calendar.naam}</span>
       </div>
 
       {/* Title + tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${calendar.kleur}20` }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={calendar.kleur} strokeWidth="1.5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${calendar.kleur}20` }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={calendar.kleur} strokeWidth="1.5">
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M3 9h18M8 2v4M16 2v4" />
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-warm-900">{calendar.naam}</h1>
-            {calendar.woning_naam && <p className="text-sm text-warm-400">{calendar.woning_naam}</p>}
+            <h1 className="text-lg font-bold text-warm-900">{calendar.naam}</h1>
+            {calendar.woning_naam && <p className="text-xs text-warm-400">{calendar.woning_naam}</p>}
           </div>
         </div>
-        <div className="flex bg-warm-50 rounded-xl p-1 gap-1">
+        <div className="flex bg-warm-50 rounded-xl p-1 gap-1 shrink-0">
           <button onClick={() => setActiveTab("kalender")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "kalender" ? "bg-white text-warm-900 shadow-sm" : "text-warm-500 hover:text-warm-700"}`}>
             Kalender
           </button>
@@ -300,115 +565,272 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       </div>
 
       {activeTab === "kalender" && (
-        <div className="bg-white rounded-2xl border border-warm-100 shadow-sm overflow-hidden">
-          {/* Month navigation */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-warm-100">
-            <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="w-9 h-9 rounded-xl hover:bg-warm-50 flex items-center justify-center text-warm-600 transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
-            </button>
-            <h2 className="font-semibold text-warm-900 capitalize">
-              {format(currentMonth, "MMMM yyyy", { locale: nl })}
-            </h2>
-            <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="w-9 h-9 rounded-xl hover:bg-warm-50 flex items-center justify-center text-warm-600 transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+        <>
+          {/* Controls row 1 */}
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            {/* Kalender dropdown */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-warm-500 font-medium whitespace-nowrap">Kalender:</label>
+              <select
+                value={calendar.id}
+                onChange={e => router.push(`/dashboard/kalender/${e.target.value}`)}
+                className="border border-warm-200 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white text-warm-800 font-medium"
+              >
+                {allCalendars.map(c => (
+                  <option key={c.id} value={c.id}>{c.naam}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Jaaroverzicht button */}
+            <button
+              onClick={() => setJaaroverzichtOpen(true)}
+              className="flex items-center gap-1.5 border border-warm-200 text-warm-700 hover:bg-warm-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M3 9h18M8 2v4M16 2v4" />
+              </svg>
+              Jaaroverzicht
             </button>
           </div>
 
-          <div className="p-4 sm:p-6">
-            {selecting && (
-              <p className="text-sm text-accent bg-accent-light rounded-xl px-4 py-2.5 mb-4 text-center font-medium">
-                Klik op de einddatum van de reservatie
-              </p>
-            )}
-
-            {/* Day labels */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
-                <div key={d} className="text-center text-xs font-medium text-warm-400 py-1">{d}</div>
-              ))}
+          {/* Controls row 2 */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            {/* Aantal maanden */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-warm-500 font-medium whitespace-nowrap">Aantal maanden:</label>
+              <select
+                value={aantalMaanden}
+                onChange={e => setAantalMaanden(Number(e.target.value))}
+                className="border border-warm-200 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white text-warm-800"
+              >
+                {AANTALMAANDEN_OPTIONS.map(n => (
+                  <option key={n} value={n}>{n} {n === 1 ? "maand" : "maanden"}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {[...Array(startPad)].map((_, i) => <div key={`pad-${i}`} />)}
-              {days.map(day => {
-                const dayBookings = getBookingsForDay(day);
-                const booking = dayBookings[0];
-                const inSel = isInSelection(day);
-                const isStart = selectStart && format(day, "yyyy-MM-dd") === format(selectStart, "yyyy-MM-dd");
+            {/* Spacer */}
+            <div className="flex-1" />
 
-                let cellClass = "relative py-2 sm:py-3 rounded-xl text-center text-sm cursor-pointer select-none transition-colors ";
-                if (booking) {
-                  cellClass += `${STATUS_COLORS[booking.status].bg} ${STATUS_COLORS[booking.status].text} font-medium`;
-                } else if (inSel) {
-                  cellClass += "bg-accent/15 text-accent font-medium";
-                } else {
-                  cellClass += "text-warm-700 hover:bg-warm-50";
-                }
+            {/* Zoek huurder */}
+            <button
+              onClick={() => setZoekOpen(v => !v)}
+              className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${zoekOpen ? "bg-accent-light border-accent text-accent" : "border-warm-200 text-warm-700 hover:bg-warm-50"}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Zoek een huurder
+            </button>
 
-                return (
-                  <div
-                    key={day.toISOString()}
-                    className={cellClass}
-                    onClick={() => handleDayClick(day)}
-                    onMouseEnter={() => handleDayHover(day)}
-                  >
-                    {format(day, "d")}
-                    {booking?.gast_naam && (
-                      <div className="absolute bottom-0.5 left-0 right-0 flex justify-center">
-                        <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mt-5 pt-4 border-t border-warm-50 text-xs text-warm-500">
-              {(Object.entries(STATUS_LABELS) as [BookingStatus, string][]).map(([s, label]) => (
-                <span key={s} className="flex items-center gap-1.5">
-                  <span className={`w-2.5 h-2.5 rounded ${STATUS_COLORS[s].bg} inline-block`} />
-                  {label}
-                </span>
-              ))}
-              <span className="text-warm-400 ml-auto hidden sm:block">Klik op een datum om een reservatie toe te voegen</span>
-            </div>
+            {/* Boeking toevoegen */}
+            <button
+              onClick={() => {
+                setSelecting(false);
+                setSelectStart(new Date());
+                setSelectEnd(new Date());
+                setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "" });
+                setModal("new");
+              }}
+              className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Boeking toevoegen
+            </button>
           </div>
 
-          {/* Upcoming bookings list */}
-          <div className="border-t border-warm-100 px-6 py-4">
-            <h3 className="text-sm font-semibold text-warm-700 mb-3">Komende reservaties</h3>
-            {bookings.filter(b => b.eind_datum >= format(new Date(), "yyyy-MM-dd")).length === 0 ? (
-              <p className="text-sm text-warm-400">Nog geen reservaties.</p>
-            ) : (
-              <div className="space-y-2">
-                {bookings
-                  .filter(b => b.eind_datum >= format(new Date(), "yyyy-MM-dd"))
-                  .sort((a, b) => a.start_datum.localeCompare(b.start_datum))
-                  .slice(0, 5)
-                  .map(b => (
-                    <div key={b.id} className="flex items-center gap-3 py-2">
-                      <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[b.status].dot} shrink-0`} />
-                      <span className="text-sm text-warm-700 font-medium min-w-[140px]">
-                        {format(parseISO(b.start_datum), "d MMM", { locale: nl })} — {format(parseISO(b.eind_datum), "d MMM yyyy", { locale: nl })}
-                      </span>
-                      {b.gast_naam && <span className="text-sm text-warm-500">{b.gast_naam}</span>}
-                      {b.bron && b.bron !== "import" && (
-                        <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${BRON_COLORS[b.bron] ?? "bg-warm-100 text-warm-600"}`}>
-                          {BRON_LABELS[b.bron] ?? b.bron}
-                        </span>
-                      )}
+          {/* Zoek bar */}
+          {zoekOpen && (
+            <div className="mb-4 bg-white border border-warm-200 rounded-xl p-3 shadow-sm">
+              <input
+                type="text"
+                value={zoekQuery}
+                onChange={e => setZoekQuery(e.target.value)}
+                placeholder="Zoek op naam huurder..."
+                className="w-full border border-warm-200 rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                autoFocus
+              />
+              {zoekQuery.trim() && (
+                <div className="mt-2 space-y-1">
+                  {zoekResultaten.length === 0 ? (
+                    <p className="text-sm text-warm-400 px-1">Geen huurders gevonden.</p>
+                  ) : (
+                    zoekResultaten.map(b => (
                       <button
-                        onClick={() => { setEditingBooking(b); setFormData({ gastNaam: b.gast_naam || "", status: b.status, notities: b.notities || "", bron: b.bron || "" }); setModal("edit"); }}
-                        className={`${b.bron && b.bron !== "import" ? "" : "ml-auto"} text-xs text-warm-400 hover:text-accent transition-colors shrink-0`}
+                        key={b.id}
+                        onClick={() => {
+                          setEditingBooking(b);
+                          setFormData({
+                            gastNaam: b.gast_naam || "",
+                            status: b.status,
+                            notities: b.notities || "",
+                            priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
+                            bron: b.bron || "",
+                          });
+                          setModal("edit");
+                          setZoekOpen(false);
+                          setZoekQuery("");
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-warm-50 text-left transition-colors"
                       >
-                        Bewerken
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_HEX[b.status] }} />
+                        <span className="font-medium text-sm text-warm-800">{b.gast_naam}</span>
+                        <span className="text-xs text-warm-400 ml-auto">
+                          {format(parseISO(b.start_datum), "d MMM", { locale: nl })} t/m {format(parseISO(b.eind_datum), "d MMM yyyy", { locale: nl })}
+                        </span>
                       </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Selection hint */}
+          {selecting && (
+            <p className="text-sm text-accent bg-accent-light rounded-xl px-4 py-2 mb-4 text-center font-medium">
+              Klik op de einddatum van de reservatie
+            </p>
+          )}
+
+          {/* Navigation row */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setStartDate(d => subMonths(d, 12))}
+              className="flex items-center gap-1 border border-warm-200 text-warm-600 hover:bg-warm-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+              12mnd
+            </button>
+            <button
+              onClick={() => setStartDate(d => subMonths(d, 1))}
+              className="flex items-center gap-1 border border-warm-200 text-warm-600 hover:bg-warm-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+              1mnd
+            </button>
+            <button
+              onClick={() => setStartDate(startOfMonth(new Date()))}
+              className="border border-warm-200 text-warm-700 hover:bg-warm-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+            >
+              nu
+            </button>
+            <button
+              onClick={() => setStartDate(d => addMonths(d, 1))}
+              className="flex items-center gap-1 border border-warm-200 text-warm-600 hover:bg-warm-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              1mnd
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+            </button>
+            <button
+              onClick={() => setStartDate(d => addMonths(d, 12))}
+              className="flex items-center gap-1 border border-warm-200 text-warm-600 hover:bg-warm-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              12mnd
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+            </button>
+          </div>
+
+          {/* Multi-month calendar grid */}
+          <div
+            className={`grid gap-3 mb-4 ${
+              aantalMaanden === 1
+                ? "grid-cols-1 max-w-xs"
+                : aantalMaanden === 2
+                ? "grid-cols-1 sm:grid-cols-2"
+                : aantalMaanden === 3
+                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                : aantalMaanden === 4
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+                : aantalMaanden === 5
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5"
+                : aantalMaanden === 6
+                ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+                : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
+            }`}
+          >
+            {months.map(m => renderMonth(m))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-4 text-xs text-warm-500 mb-6 px-1">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: STATUS_HEX.bezet }} />
+              Bezet
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: STATUS_HEX.optie }} />
+              Optie
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: STATUS_HEX.geblokkeerd }} />
+              Geblokkeerd
+            </span>
+            <span className="text-warm-400 ml-auto hidden sm:block">Klik op een datum om een reservatie toe te voegen</span>
+          </div>
+
+          {/* Upcoming bookings */}
+          <div className="bg-white rounded-2xl border border-warm-100 shadow-sm">
+            <div className="px-6 py-4 border-b border-warm-100">
+              <h3 className="text-sm font-semibold text-warm-700">Komende reservaties</h3>
+            </div>
+            <div className="px-6 py-4">
+              {komende.length === 0 ? (
+                <p className="text-sm text-warm-400">Nog geen reservaties gepland.</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {(toonMeerReservaties ? komende : komende.slice(0, 10)).map(b => (
+                      <div key={b.id} className="flex items-center gap-3 py-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_HEX[b.status] }} />
+                        <span className="text-sm text-warm-700 font-medium min-w-[150px]">
+                          {format(parseISO(b.start_datum), "d MMM", { locale: nl })} t/m {format(parseISO(b.eind_datum), "d MMM yyyy", { locale: nl })}
+                        </span>
+                        {b.gast_naam && <span className="text-sm text-warm-500 truncate">{b.gast_naam}</span>}
+                        {b.bron && b.bron !== "import" && (
+                          <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${BRON_COLORS[b.bron] ?? "bg-warm-100 text-warm-600"}`}>
+                            {BRON_LABELS[b.bron] ?? b.bron}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditingBooking(b);
+                            setFormData({
+                              gastNaam: b.gast_naam || "",
+                              status: b.status,
+                              notities: b.notities || "",
+                              priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
+                              bron: b.bron || "",
+                            });
+                            setModal("edit");
+                          }}
+                          className={`${b.bron && b.bron !== "import" ? "" : "ml-auto"} text-xs text-warm-400 hover:text-accent transition-colors shrink-0`}
+                        >
+                          Bewerken
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {komende.length > 10 && (
+                    <button
+                      onClick={() => setToonMeerReservaties(v => !v)}
+                      className="mt-3 text-sm text-accent hover:text-accent-hover font-medium transition-colors"
+                    >
+                      {toonMeerReservaties ? "Minder tonen" : `Meer tonen (${komende.length - 10} overige)`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Herkomst statistieken */}
@@ -423,7 +845,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             }
             const sorted = Object.entries(perBron).sort((a, b) => b[1] - a[1]);
             return (
-              <div className="border-t border-warm-100 px-6 py-4">
+              <div className="bg-white rounded-2xl border border-warm-100 shadow-sm mt-3 px-6 py-4">
                 <h3 className="text-sm font-semibold text-warm-700 mb-3">Herkomst boekingen</h3>
                 <div className="space-y-2.5">
                   {sorted.map(([bron, aantal]) => {
@@ -450,7 +872,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               </div>
             );
           })()}
-        </div>
+        </>
       )}
 
       {activeTab === "embed" && (
@@ -458,9 +880,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           <h2 className="text-lg font-semibold text-warm-900 mb-2">Embed op je website</h2>
           <p className="text-warm-500 text-sm mb-6">
             Kopieer de onderstaande code en plak deze op je website waar je de kalender wil tonen.
-            Bezoekers zien enkel bezet/vrij — geen gastgegevens.
+            Bezoekers zien enkel bezet/vrij, geen gastgegevens.
           </p>
-
           <div className="bg-warm-900 rounded-xl p-4 mb-4 relative">
             <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">
               {embedCode}
@@ -476,19 +897,16 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               )}
             </button>
           </div>
-
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+          <div className="bg-accent-light border border-warm-200 rounded-xl p-4 text-sm text-warm-700">
             <strong>Hoe installeren?</strong> Plak de code in je website-editor, net voor de sluitende &lt;/body&gt;-tag.
             Werkt op WordPress, Wix, Squarespace en elke andere website.
           </div>
-
         </div>
       )}
 
       {activeTab === "ical" && (
         <div className="bg-white rounded-2xl border border-warm-100 shadow-sm p-8 space-y-8">
 
-          {/* Section 1: Beschikbaarheid delen */}
           <div>
             <h2 className="text-lg font-semibold text-warm-900 mb-1">Beschikbaarheid delen</h2>
             <p className="text-warm-500 text-sm mb-4">
@@ -520,16 +938,13 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </a>
           </div>
 
-          {/* Divider */}
           <div className="border-t border-warm-100" />
 
-          {/* Section 2: iCal exporteren */}
           <div>
             <h2 className="text-lg font-semibold text-warm-900 mb-1">iCal exporteren</h2>
             <p className="text-warm-500 text-sm mb-4">
               Gebruik deze link om jouw kalender te synchroniseren met Google Agenda, Outlook, Apple Kalender of andere boekingssystemen. Elke wijziging in je kalender wordt automatisch doorgegeven.
             </p>
-
             <div className="bg-warm-900 rounded-xl p-4 mb-4 relative">
               <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed pr-24">
                 {icalUrl}
@@ -545,7 +960,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 )}
               </button>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { name: "Google Agenda", hint: "Andere agenda's > Via URL" },
@@ -560,17 +974,14 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </div>
           </div>
 
-          {/* Divider */}
           <div className="border-t border-warm-100" />
 
-          {/* Section 3: Externe kalenders importeren */}
           <div>
             <h2 className="text-lg font-semibold text-warm-900 mb-1">Externe kalenders importeren</h2>
             <p className="text-warm-500 text-sm mb-5">
               Voeg iCal-links toe van Airbnb, Booking.com of andere platforms. Geïmporteerde periodes worden als geblokkeerd gemarkeerd in je kalender.
             </p>
 
-            {/* Existing import URLs */}
             {icalImports.length > 0 && (
               <div className="space-y-2 mb-5">
                 {icalImports.map((imp, index) => (
@@ -596,7 +1007,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               </div>
             )}
 
-            {/* Platform shortcuts */}
             <div className="flex flex-wrap gap-2 mb-4">
               <p className="w-full text-xs text-warm-400 mb-1">Snel toevoegen:</p>
               {[
@@ -606,17 +1016,12 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 { naam: "Micazu", kleur: "bg-[#0077C8]/10 text-[#0077C8] border-[#0077C8]/20 hover:bg-[#0077C8]/20" },
                 { naam: "vakantiewoningen-in-belgie.be", kleur: "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20" },
               ].map(p => (
-                <button
-                  key={p.naam}
-                  onClick={() => setImportNaam(p.naam)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${p.kleur}`}
-                >
+                <button key={p.naam} onClick={() => setImportNaam(p.naam)} className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${p.kleur}`}>
                   {p.naam}
                 </button>
               ))}
             </div>
 
-            {/* Add import URL form */}
             <div className="bg-warm-50 border border-warm-100 rounded-xl p-4 mb-5">
               <p className="text-sm font-medium text-warm-700 mb-3">URL toevoegen</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -625,14 +1030,14 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   value={importNaam}
                   onChange={e => setImportNaam(e.target.value)}
                   placeholder="Naam (bijv. Airbnb)"
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                 />
                 <input
                   type="url"
                   value={importUrl}
                   onChange={e => setImportUrl(e.target.value)}
                   placeholder="https://www.airbnb.be/calendar/ical/..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                 />
               </div>
               <button
@@ -640,15 +1045,12 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 disabled={isSavingImport || !importNaam.trim() || !importUrl.trim()}
                 className="bg-accent hover:bg-accent-hover text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isSavingImport ? (
-                  "Opslaan..."
-                ) : (
+                {isSavingImport ? "Opslaan..." : (
                   <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Toevoegen</>
                 )}
               </button>
             </div>
 
-            {/* Sync button + result */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <button
                 onClick={handleSync}
@@ -661,35 +1063,47 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>Nu synchroniseren</>
                 )}
               </button>
-
               {syncResult && (
-                <div className={`text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 ${
-                  syncResult.errors.length > 0 ? "bg-amber-50 border border-amber-200 text-amber-700" : "bg-green-50 border border-green-200 text-green-700"
-                }`}>
+                <div className={`text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 ${syncResult.errors.length > 0 ? "bg-amber-50 border border-amber-200 text-amber-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
                   {syncResult.errors.length === 0 ? (
-                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>
-                    {syncResult.synced} {syncResult.synced === 1 ? "boeking" : "boekingen"} gesynchroniseerd</>
+                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>{syncResult.synced} {syncResult.synced === 1 ? "boeking" : "boekingen"} gesynchroniseerd</>
                   ) : (
-                    <span>
-                      {syncResult.synced > 0 && `${syncResult.synced} gesynchroniseerd. `}
-                      Fouten: {syncResult.errors.join(", ")}
-                    </span>
+                    <span>{syncResult.synced > 0 && `${syncResult.synced} gesynchroniseerd. `}Fouten: {syncResult.errors.join(", ")}</span>
                   )}
                 </div>
               )}
             </div>
           </div>
 
+          <div className="border-t border-warm-100" />
+
+          <div>
+            <h2 className="text-lg font-semibold text-warm-900 mb-1">Boekingen importeren vanuit CSV</h2>
+            <p className="text-warm-500 text-sm mb-4">
+              Gebruik je huurkalender.nl? Importeer je bestaande boekingen in één klik via het CSV-exportbestand.
+            </p>
+            <Link
+              href={`/dashboard/kalender/${calendar.id}/importeer`}
+              className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Boekingen importeren
+            </Link>
+          </div>
         </div>
       )}
 
       {/* Modal: nieuwe reservatie */}
       {modal === "new" && selectStart && selectEnd && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={cancelModal}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-warm-900 mb-1">Reservatie toevoegen</h3>
             <p className="text-sm text-warm-500 mb-5">
-              {format(selectStart, "d MMMM", { locale: nl })} — {format(selectEnd, "d MMMM yyyy", { locale: nl })}
+              {format(selectStart, "d MMMM", { locale: nl })} t/m {format(selectEnd, "d MMMM yyyy", { locale: nl })}
             </p>
             <div className="space-y-4">
               <div>
@@ -699,7 +1113,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   value={formData.gastNaam}
                   onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
                   placeholder="Jan Janssen"
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                   autoFocus
                 />
               </div>
@@ -723,13 +1137,23 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Notities (optioneel)</label>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Publieke aantekeningen</label>
                 <textarea
                   value={formData.notities}
                   onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
                   rows={2}
-                  placeholder="Aankomsttijd, sleutelafspraak..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none"
+                  placeholder="Zichtbaar op de boekingsbevestiging voor de gast..."
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
+                <textarea
+                  value={formData.priveNotities}
+                  onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
+                  rows={2}
+                  placeholder="Enkel zichtbaar voor jou, niet voor de gast..."
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
                 />
               </div>
               <div>
@@ -737,7 +1161,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 <select
                   value={formData.bron}
                   onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                 >
                   {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -758,10 +1182,10 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       {/* Modal: reservatie bewerken */}
       {modal === "edit" && editingBooking && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={cancelModal}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-warm-900 mb-1">Reservatie bewerken</h3>
             <p className="text-sm text-warm-500 mb-5">
-              {format(parseISO(editingBooking.start_datum), "d MMMM", { locale: nl })} — {format(parseISO(editingBooking.eind_datum), "d MMMM yyyy", { locale: nl })}
+              {format(parseISO(editingBooking.start_datum), "d MMMM", { locale: nl })} t/m {format(parseISO(editingBooking.eind_datum), "d MMMM yyyy", { locale: nl })}
             </p>
             <div className="space-y-4">
               <div>
@@ -771,7 +1195,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   value={formData.gastNaam}
                   onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
                   placeholder="Jan Janssen"
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                   autoFocus
                 />
               </div>
@@ -795,13 +1219,23 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Notities</label>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Publieke aantekeningen</label>
                 <textarea
                   value={formData.notities}
                   onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
                   rows={2}
-                  placeholder="Aankomsttijd, sleutelafspraak..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none"
+                  placeholder="Zichtbaar op de boekingsbevestiging voor de gast..."
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
+                <textarea
+                  value={formData.priveNotities}
+                  onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
+                  rows={2}
+                  placeholder="Enkel zichtbaar voor jou, niet voor de gast..."
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
                 />
               </div>
               <div>
@@ -809,7 +1243,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 <select
                   value={formData.bron}
                   onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white"
+                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                 >
                   {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -825,6 +1259,42 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               <button onClick={handleSaveEdit} disabled={saving} className="flex-1 py-2.5 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-60">
                 {saving ? "Opslaan..." : "Opslaan"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jaaroverzicht modal */}
+      {jaaroverzichtOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-6 overflow-y-auto" onClick={() => setJaaroverzichtOpen(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6 print:hidden">
+              <h2 className="text-xl font-bold text-warm-900">Jaaroverzicht {new Date().getFullYear()}</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  Afdrukken
+                </button>
+                <button
+                  onClick={() => setJaaroverzichtOpen(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-warm-100 flex items-center justify-center text-warm-500 transition-colors"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {jaarMaanden.map(m => renderMonth(m))}
             </div>
           </div>
         </div>
