@@ -323,8 +323,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const above = spaceBelow < 160;
     setHoveredTooltip({
       booking,
-      top: above ? rect.top + window.scrollY - 8 : rect.bottom + window.scrollY + 8,
-      left: rect.left + window.scrollX + rect.width / 2,
+      top: above ? rect.top - 8 : rect.bottom + 8,
+      left: rect.left + rect.width / 2,
       above,
     });
   }
