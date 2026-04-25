@@ -20,6 +20,7 @@ import {
   endOfWeek,
   eachWeekOfInterval,
   getISOWeek,
+  differenceInDays,
 } from "date-fns";
 import { nl } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
@@ -95,7 +96,86 @@ const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; dot: stri
   geblokkeerd: { bg: "bg-warm-100", text: "text-warm-500", dot: "bg-warm-400" },
 };
 
+const TAAL_OPTIONS = [
+  { value: "NL", label: "Nederlands" },
+  { value: "FR", label: "Frans" },
+  { value: "DE", label: "Duits" },
+  { value: "EN", label: "Engels" },
+];
+
 const AANTALMAANDEN_OPTIONS = [1, 2, 3, 4, 5, 6, 12];
+
+// Full formData shape — all fields in one place
+interface FormData {
+  gastNaam: string;
+  status: BookingStatus;
+  notities: string;
+  notitiesVerborgen: boolean;
+  priveNotities: string;
+  bron: string;
+  facturatiePrijs: string;
+  prijsTotaal: string;
+  gastEmail: string;
+  gastTelefoon: string;
+  gastAdres: string;
+  gastPostcode: string;
+  gastGemeente: string;
+  gastLand: string;
+  taal: string;
+  aantalVolwassenen: string;
+  aantalKinderen: string;
+  checkInTijd: string;
+  checkUitTijd: string;
+  boekingNummerExtern: string;
+}
+
+const EMPTY_FORM: FormData = {
+  gastNaam: "",
+  status: "bezet",
+  notities: "",
+  notitiesVerborgen: false,
+  priveNotities: "",
+  bron: "",
+  facturatiePrijs: "",
+  prijsTotaal: "",
+  gastEmail: "",
+  gastTelefoon: "",
+  gastAdres: "",
+  gastPostcode: "",
+  gastGemeente: "",
+  gastLand: "",
+  taal: "",
+  aantalVolwassenen: "",
+  aantalKinderen: "",
+  checkInTijd: "",
+  checkUitTijd: "",
+  boekingNummerExtern: "",
+};
+
+function bookingToFormData(b: Booking): FormData {
+  return {
+    gastNaam: b.gast_naam || "",
+    status: b.status,
+    notities: b.notities || "",
+    notitiesVerborgen: false, // no DB field yet — defaults to false
+    priveNotities: b.prive_notities || "",
+    bron: b.bron || "",
+    facturatiePrijs: b.facturatie_prijs?.toString() || "",
+    prijsTotaal: b.prijs_totaal?.toString() || "",
+    gastEmail: b.gast_email || "",
+    gastTelefoon: b.gast_telefoon || "",
+    gastAdres: b.gast_adres || "",
+    gastPostcode: b.gast_postcode || "",
+    gastGemeente: b.gast_gemeente || "",
+    gastLand: b.gast_land || "",
+    taal: b.taal || "",
+    aantalVolwassenen: b.aantal_volwassenen?.toString() || "",
+    aantalKinderen: b.aantal_kinderen?.toString() || "",
+    checkInTijd: b.check_in_tijd || "",
+    checkUitTijd: b.check_uit_tijd || "",
+    boekingNummerExtern: b.boeking_nummer_extern || "",
+  };
+}
 
 export default function KalenderClient({ calendar, initialBookings, initialIcalImports, allCalendars }: Props) {
   const router = useRouter();
@@ -108,14 +188,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
   const [modal, setModal] = useState<"new" | "edit" | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [formData, setFormData] = useState({
-    gastNaam: "",
-    status: "bezet" as BookingStatus,
-    notities: "",
-    priveNotities: "",
-    bron: "",
-    facturatiePrijs: "",
-  });
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"kalender" | "embed" | "ical">("kalender");
   const [copied, setCopied] = useState(false);
@@ -125,6 +198,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [zoekOpen, setZoekOpen] = useState(false);
   const [toonMeerReservaties, setToonMeerReservaties] = useState(false);
   const [jaaroverzichtOpen, setJaaroverzichtOpen] = useState(false);
+  const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [hoveredTooltip, setHoveredTooltip] = useState<{
     booking: Booking;
     top: number;
@@ -151,6 +225,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (copiedIcalTimerRef.current) clearTimeout(copiedIcalTimerRef.current);
       if (copiedBeschikbaarheidTimerRef.current) clearTimeout(copiedBeschikbaarheidTimerRef.current);
+      if (tooltipHideTimer.current) clearTimeout(tooltipHideTimer.current);
     };
   }, []);
 
@@ -174,41 +249,37 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       return { backgroundColor: STATUS_HEX[fullBooking.status] };
     }
     if (arrivalBooking && departureBooking) {
-      // Changeover: departure bottom-left, arrival top-right
       const depColor = STATUS_HEX[departureBooking.status];
       const arrColor = STATUS_HEX[arrivalBooking.status];
       return { background: `linear-gradient(to top left, ${depColor} 50%, ${arrColor} 50%)` };
     }
     if (arrivalBooking) {
-      // Arrival: top-right half colored
       const color = STATUS_HEX[arrivalBooking.status];
       return { background: `linear-gradient(to top left, ${color} 50%, transparent 50%)` };
     }
     if (departureBooking) {
-      // Departure: bottom-left half colored
       const color = STATUS_HEX[departureBooking.status];
       return { background: `linear-gradient(to top left, transparent 50%, ${color} 50%)` };
     }
     return {};
   }
 
+  // --- Open edit modal for a booking ---
+  function openEditModal(b: Booking) {
+    setEditingBooking(b);
+    setFormData(bookingToFormData(b));
+    setContactInfoOpen(false);
+    setModal("edit");
+  }
+
   // --- Booking interaction ---
-  function handleDayClick(date: Date) {
+  function handleDayClick(date: Date, e?: React.MouseEvent) {
     const dateStr = format(date, "yyyy-MM-dd");
     const dayBookings = getBookingsForDay(dateStr);
 
     if (dayBookings.length > 0) {
-      const b = dayBookings[0];
-      setEditingBooking(b);
-      setFormData({
-        gastNaam: b.gast_naam || "",
-        status: b.status,
-        notities: b.notities || "",
-        priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
-        bron: b.bron || "",
-        facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
-      });
-      setModal("edit");
+      // If tooltip is open for this booking, open the edit modal
+      openEditModal(dayBookings[0]);
       return;
     }
 
@@ -223,7 +294,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       setSelectStart(actualStart);
       setSelectEnd(actualEnd);
       setSelecting(false);
-      setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "", facturatiePrijs: "" });
+      setFormData(EMPTY_FORM);
       setModal("new");
     }
   }
@@ -240,6 +311,37 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     return isWithinInterval(date, { start: selectStart, end: selectEnd });
   }
 
+  // --- Tooltip handlers ---
+  function showTooltip(booking: Booking, cellEl: HTMLElement) {
+    if (selecting) return;
+    if (tooltipHideTimer.current) {
+      clearTimeout(tooltipHideTimer.current);
+      tooltipHideTimer.current = null;
+    }
+    const rect = cellEl.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const above = spaceBelow < 160;
+    setHoveredTooltip({
+      booking,
+      top: above ? rect.top + window.scrollY - 8 : rect.bottom + window.scrollY + 8,
+      left: rect.left + window.scrollX + rect.width / 2,
+      above,
+    });
+  }
+
+  function hideTooltipDelayed() {
+    if (tooltipHideTimer.current) clearTimeout(tooltipHideTimer.current);
+    tooltipHideTimer.current = setTimeout(() => setHoveredTooltip(null), 200);
+  }
+
+  async function handleDeleteFromTooltip(b: Booking) {
+    if (!window.confirm(`Reservatie van ${b.gast_naam || "onbekende gast"} verwijderen?`)) return;
+    const supabase = createClient();
+    await supabase.from("bookings").delete().eq("id", b.id);
+    setBookings(prev => prev.filter(x => x.id !== b.id));
+    setHoveredTooltip(null);
+  }
+
   // --- CRUD ---
   async function handleSaveNew() {
     if (!selectStart || !selectEnd) return;
@@ -252,11 +354,24 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         start_datum: format(selectStart, "yyyy-MM-dd"),
         eind_datum: format(selectEnd, "yyyy-MM-dd"),
         gast_naam: formData.gastNaam || null,
+        gast_email: formData.gastEmail || null,
+        gast_telefoon: formData.gastTelefoon || null,
+        gast_adres: formData.gastAdres || null,
+        gast_postcode: formData.gastPostcode || null,
+        gast_gemeente: formData.gastGemeente || null,
+        gast_land: formData.gastLand || null,
+        taal: formData.taal || null,
+        aantal_volwassenen: formData.aantalVolwassenen ? Number(formData.aantalVolwassenen) : null,
+        aantal_kinderen: formData.aantalKinderen ? Number(formData.aantalKinderen) : null,
+        check_in_tijd: formData.checkInTijd || null,
+        check_uit_tijd: formData.checkUitTijd || null,
         status: formData.status,
         notities: formData.notities || null,
         prive_notities: formData.priveNotities || null,
         bron: formData.bron || null,
+        prijs_totaal: formData.prijsTotaal ? Number(formData.prijsTotaal) : null,
         facturatie_prijs: formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null,
+        boeking_nummer_extern: formData.boekingNummerExtern || null,
       })
       .select()
       .single();
@@ -275,11 +390,24 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
       .from("bookings")
       .update({
         gast_naam: formData.gastNaam || null,
+        gast_email: formData.gastEmail || null,
+        gast_telefoon: formData.gastTelefoon || null,
+        gast_adres: formData.gastAdres || null,
+        gast_postcode: formData.gastPostcode || null,
+        gast_gemeente: formData.gastGemeente || null,
+        gast_land: formData.gastLand || null,
+        taal: formData.taal || null,
+        aantal_volwassenen: formData.aantalVolwassenen ? Number(formData.aantalVolwassenen) : null,
+        aantal_kinderen: formData.aantalKinderen ? Number(formData.aantalKinderen) : null,
+        check_in_tijd: formData.checkInTijd || null,
+        check_uit_tijd: formData.checkUitTijd || null,
         status: formData.status,
         notities: formData.notities || null,
         prive_notities: formData.priveNotities || null,
         bron: formData.bron || null,
+        prijs_totaal: formData.prijsTotaal ? Number(formData.prijsTotaal) : null,
         facturatie_prijs: formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null,
+        boeking_nummer_extern: formData.boekingNummerExtern || null,
       })
       .eq("id", editingBooking.id);
     if (!error) {
@@ -289,10 +417,24 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             ? {
                 ...b,
                 gast_naam: formData.gastNaam || null,
+                gast_email: formData.gastEmail || null,
+                gast_telefoon: formData.gastTelefoon || null,
+                gast_adres: formData.gastAdres || null,
+                gast_postcode: formData.gastPostcode || null,
+                gast_gemeente: formData.gastGemeente || null,
+                gast_land: formData.gastLand || null,
+                taal: formData.taal || null,
+                aantal_volwassenen: formData.aantalVolwassenen ? Number(formData.aantalVolwassenen) : null,
+                aantal_kinderen: formData.aantalKinderen ? Number(formData.aantalKinderen) : null,
+                check_in_tijd: formData.checkInTijd || null,
+                check_uit_tijd: formData.checkUitTijd || null,
                 status: formData.status,
                 notities: formData.notities || null,
                 prive_notities: formData.priveNotities || null,
                 bron: (formData.bron || null) as import("@/lib/types").BookingBron,
+                prijs_totaal: formData.prijsTotaal ? Number(formData.prijsTotaal) : null,
+                facturatie_prijs: formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null,
+                boeking_nummer_extern: formData.boekingNummerExtern || null,
               }
             : b
         )
@@ -320,6 +462,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     setSelectStart(null);
     setSelectEnd(null);
     setSelecting(false);
+    setContactInfoOpen(false);
   }
 
   // --- Copy helpers ---
@@ -419,6 +562,13 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     return Array.from({ length: 12 }, (_, i) => addMonths(jan, i));
   }, []);
 
+  // --- Nights calculation helpers ---
+  function calcNachten(startStr: string, eindStr: string): number {
+    return Math.round(
+      (new Date(eindStr).getTime() - new Date(startStr).getTime()) / (1000 * 60 * 60 * 24)
+    );
+  }
+
   // --- Render a single month block ---
   function renderMonth(month: Date) {
     const mStart = startOfMonth(month);
@@ -440,7 +590,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             <span className="text-sm font-bold text-warm-900 capitalize">{monthLabel}</span>
             <span className="text-xs text-warm-400">{yearLabel}</span>
           </div>
-          {/* Large faded month number top-right */}
           <span className="absolute top-1 right-3 text-4xl font-black text-warm-100 select-none leading-none pointer-events-none">
             {monthNumber}
           </span>
@@ -477,7 +626,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     const dateStr = format(day, "yyyy-MM-dd");
                     const dayBookings = getBookingsForDay(dateStr);
 
-                    // Categorize bookings
                     const fullBookings = dayBookings.filter(
                       b => dateStr > b.start_datum && dateStr < b.eind_datum
                     );
@@ -490,11 +638,13 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     const departureBooking = departureBookings[0] ?? null;
                     const hasAnyBooking = dayBookings.length > 0;
 
+                    // Pick the booking to associate with hover/click (prefer full, then arrival, then departure)
+                    const primaryBooking = fullBooking ?? arrivalBooking ?? departureBooking ?? null;
+
                     const inSel = isInSelection(day);
                     const isTod = isToday(day);
                     const isPastDay = isPast(day) && !isToday(day);
 
-                    // Highlighted by search
                     const isHighlighted =
                       zoekQuery.trim().length > 0 &&
                       zoekResultaten.some(
@@ -509,8 +659,16 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       <div
                         key={day.toISOString()}
                         onClick={() => isCurrentMonth && handleDayClick(day)}
-                        onMouseEnter={() => handleDayHover(day)}
-                        onMouseLeave={() => setHoverDate(null)}
+                        onMouseEnter={e => {
+                          handleDayHover(day);
+                          if (isCurrentMonth && primaryBooking && !selecting) {
+                            showTooltip(primaryBooking, e.currentTarget as HTMLElement);
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoverDate(null);
+                          hideTooltipDelayed();
+                        }}
                         className={[
                           "relative flex items-center justify-center rounded-md text-[11px] font-medium transition-all select-none",
                           "aspect-square",
@@ -525,12 +683,10 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                         ].filter(Boolean).join(" ")}
                         style={isCurrentMonth ? cellStyle : {}}
                       >
-                        {/* Day number */}
                         <span className={isTod && isCurrentMonth ? "relative z-10" : ""}>
                           {format(day, "d")}
                         </span>
 
-                        {/* Today ring */}
                         {isTod && isCurrentMonth && (
                           <span
                             className="absolute inset-0.5 rounded-md border-2 border-accent pointer-events-none"
@@ -538,7 +694,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                           />
                         )}
 
-                        {/* Guest name dot for bookings with name */}
                         {isCurrentMonth && dayBookings.some(b => b.gast_naam && dateStr === b.start_datum) && (
                           <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-70 pointer-events-none" />
                         )}
@@ -594,7 +749,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         <>
           {/* Controls row 1 */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            {/* Kalender dropdown */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-warm-500 font-medium whitespace-nowrap">Kalender:</label>
               <select
@@ -607,11 +761,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 ))}
               </select>
             </div>
-
-            {/* Spacer */}
             <div className="flex-1" />
-
-            {/* Jaaroverzicht button */}
             <button
               onClick={() => setJaaroverzichtOpen(true)}
               className="flex items-center gap-1.5 border border-warm-200 text-warm-700 hover:bg-warm-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
@@ -626,7 +776,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
 
           {/* Controls row 2 */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            {/* Aantal maanden */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-warm-500 font-medium whitespace-nowrap">Aantal maanden:</label>
               <select
@@ -639,11 +788,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 ))}
               </select>
             </div>
-
-            {/* Spacer */}
             <div className="flex-1" />
-
-            {/* Zoek huurder */}
             <button
               onClick={() => setZoekOpen(v => !v)}
               className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${zoekOpen ? "bg-accent-light border-accent text-accent" : "border-warm-200 text-warm-700 hover:bg-warm-50"}`}
@@ -654,14 +799,12 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               </svg>
               Zoek een huurder
             </button>
-
-            {/* Boeking toevoegen */}
             <button
               onClick={() => {
                 setSelecting(false);
                 setSelectStart(new Date());
                 setSelectEnd(new Date());
-                setFormData({ gastNaam: "", status: "bezet", notities: "", priveNotities: "", bron: "", facturatiePrijs: "" });
+                setFormData(EMPTY_FORM);
                 setModal("new");
               }}
               className="flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors"
@@ -694,16 +837,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       <button
                         key={b.id}
                         onClick={() => {
-                          setEditingBooking(b);
-                          setFormData({
-                            gastNaam: b.gast_naam || "",
-                            status: b.status,
-                            notities: b.notities || "",
-                            priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
-                            bron: b.bron || "",
-                            facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
-                          });
-                          setModal("edit");
+                          openEditModal(b);
                           setZoekOpen(false);
                           setZoekQuery("");
                         }}
@@ -829,18 +963,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                           </span>
                         )}
                         <button
-                          onClick={() => {
-                            setEditingBooking(b);
-                            setFormData({
-                              gastNaam: b.gast_naam || "",
-                              status: b.status,
-                              notities: b.notities || "",
-                              priveNotities: (b as Booking & { prive_notities?: string }).prive_notities || "",
-                              bron: b.bron || "",
-                              facturatiePrijs: (b as Booking & { facturatie_prijs?: number | null }).facturatie_prijs?.toString() || "",
-                            });
-                            setModal("edit");
-                          }}
+                          onClick={() => openEditModal(b)}
                           className={`${b.bron && b.bron !== "import" ? "" : "ml-auto"} text-xs text-warm-400 hover:text-accent transition-colors shrink-0`}
                         >
                           Bewerken
@@ -1125,102 +1248,356 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         </div>
       )}
 
-      {/* Modal: nieuwe reservatie */}
-      {modal === "new" && selectStart && selectEnd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={cancelModal}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-warm-900 mb-1">Reservatie toevoegen</h3>
-            <p className="text-sm text-warm-500 mb-5">
-              {format(selectStart, "d MMMM", { locale: nl })} t/m {format(selectEnd, "d MMMM yyyy", { locale: nl })}
+      {/* ============================================================
+          TOOLTIP — floating on hover over booked day cell
+          ============================================================ */}
+      {hoveredTooltip && (
+        <div
+          className="fixed z-[60] pointer-events-auto"
+          style={{
+            top: hoveredTooltip.above
+              ? `${hoveredTooltip.top}px`
+              : `${hoveredTooltip.top}px`,
+            left: `${hoveredTooltip.left}px`,
+            transform: hoveredTooltip.above
+              ? "translate(-50%, -100%)"
+              : "translate(-50%, 0)",
+          }}
+          onMouseEnter={() => {
+            if (tooltipHideTimer.current) {
+              clearTimeout(tooltipHideTimer.current);
+              tooltipHideTimer.current = null;
+            }
+          }}
+          onMouseLeave={hideTooltipDelayed}
+        >
+          <div className="bg-white rounded-xl shadow-xl border border-warm-100 p-3 min-w-[200px] max-w-[260px]">
+            {/* Guest name */}
+            <p className="font-semibold text-sm text-warm-900 mb-0.5 truncate">
+              {hoveredTooltip.booking.gast_naam || "Geen naam"}
             </p>
-            <div className="space-y-4">
+            {/* Date range */}
+            <p className="text-xs text-warm-400 mb-2">
+              {format(parseISO(hoveredTooltip.booking.start_datum), "EEE dd-MM", { locale: nl })} / {format(parseISO(hoveredTooltip.booking.eind_datum), "EEE dd-MM", { locale: nl })}
+            </p>
+            {/* Status badge */}
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full mb-3 ${STATUS_COLORS[hoveredTooltip.booking.status].bg} ${STATUS_COLORS[hoveredTooltip.booking.status].text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLORS[hoveredTooltip.booking.status].dot}`} />
+              {STATUS_LABELS[hoveredTooltip.booking.status]}
+            </span>
+            {/* Actions */}
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => handleDeleteFromTooltip(hoveredTooltip.booking)}
+                className="flex-1 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Verwijder
+              </button>
+              <button
+                onClick={() => {
+                  openEditModal(hoveredTooltip.booking);
+                  setHoveredTooltip(null);
+                }}
+                className="flex-1 py-1.5 text-xs font-medium rounded-lg border border-warm-200 text-warm-700 hover:bg-warm-50 transition-colors"
+              >
+                Bekijk
+              </button>
+              <button
+                onClick={() => {
+                  openEditModal(hoveredTooltip.booking);
+                  setHoveredTooltip(null);
+                }}
+                className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors"
+              >
+                Wijzig
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          MODAL: nieuwe reservatie (extended)
+          ============================================================ */}
+      {modal === "new" && selectStart && selectEnd && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6" onClick={cancelModal}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-warm-100">
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Gastnaam (optioneel)</label>
-                <input
-                  type="text"
-                  value={formData.gastNaam}
-                  onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
-                  placeholder="Jan Janssen"
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
-                  autoFocus
-                />
+                <h3 className="text-lg font-bold text-warm-900">Reservatie toevoegen</h3>
+                <p className="text-sm text-warm-400 mt-0.5">
+                  {format(selectStart, "d MMMM", { locale: nl })} t/m {format(selectEnd, "d MMMM yyyy", { locale: nl })}
+                  {" · "}
+                  {Math.round((selectEnd.getTime() - selectStart.getTime()) / (1000 * 60 * 60 * 24))} nachten
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
-                <div className="flex gap-2">
-                  {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setFormData(f => ({ ...f, status: s }))}
-                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        formData.status === s
-                          ? `${STATUS_COLORS[s].bg} ${STATUS_COLORS[s].text}`
-                          : "bg-warm-50 text-warm-500 hover:bg-warm-100"
-                      }`}
-                    >
-                      {STATUS_LABELS[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Publieke aantekeningen</label>
-                <textarea
-                  value={formData.notities}
-                  onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
-                  rows={2}
-                  placeholder="Zichtbaar op de boekingsbevestiging voor de gast..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
-                <textarea
-                  value={formData.priveNotities}
-                  onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
-                  rows={2}
-                  placeholder="Enkel zichtbaar voor jou, niet voor de gast..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst (optioneel)</label>
-                <select
-                  value={formData.bron}
-                  onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
-                >
-                  {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              {/* Prijsopbouw */}
-              <div className="pt-2 border-t border-warm-100">
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Huurprijs per nacht (optioneel)</label>
-                <div className="relative max-w-[160px]">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+              <button onClick={cancelModal} className="w-8 h-8 rounded-lg hover:bg-warm-100 flex items-center justify-center text-warm-400 transition-colors shrink-0 mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-warm-100">
+              {/* Left column */}
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Boeking</p>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Gastnaam</label>
                   <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={formData.facturatiePrijs}
-                    onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
-                    placeholder="—"
-                    className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    type="text"
+                    value={formData.gastNaam}
+                    onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
+                    placeholder="Jan Janssen"
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    autoFocus
                   />
                 </div>
-                {formData.facturatiePrijs && selectStart && selectEnd && (() => {
-                  const nachten = Math.round((selectEnd.getTime() - selectStart.getTime()) / (1000 * 60 * 60 * 24));
-                  const totaal = Number(formData.facturatiePrijs) * nachten;
-                  return (
-                    <p className="text-xs text-warm-500 mt-1.5">
-                      {nachten} nacht{nachten !== 1 ? "en" : ""} × €{formData.facturatiePrijs} = <span className="font-semibold text-warm-800">€{totaal.toFixed(2)}</span>
-                    </p>
-                  );
-                })()}
+
+                {/* Check-in/uit tijden */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Aankomst</label>
+                    <input
+                      type="time"
+                      value={formData.checkInTijd}
+                      onChange={e => setFormData(f => ({ ...f, checkInTijd: e.target.value }))}
+                      className="w-full border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Vertrek</label>
+                    <input
+                      type="time"
+                      value={formData.checkUitTijd}
+                      onChange={e => setFormData(f => ({ ...f, checkUitTijd: e.target.value }))}
+                      className="w-full border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
+                  <div className="flex gap-2">
+                    {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, status: s }))}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          formData.status === s
+                            ? `${STATUS_COLORS[s].bg} ${STATUS_COLORS[s].text}`
+                            : "bg-warm-50 text-warm-500 hover:bg-warm-100"
+                        }`}
+                      >
+                        {STATUS_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bron */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst</label>
+                  <select
+                    value={formData.bron}
+                    onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
+                  >
+                    {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Prijzen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Totaalprijs</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={formData.prijsTotaal}
+                        onChange={e => setFormData(f => ({ ...f, prijsTotaal: e.target.value }))}
+                        placeholder="—"
+                        className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Prijs/nacht</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={formData.facturatiePrijs}
+                        onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
+                        placeholder="—"
+                        className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notities */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Aantekeningen</label>
+                  <textarea
+                    value={formData.notities}
+                    onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
+                    rows={2}
+                    placeholder="Zichtbaar voor de gast..."
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                  />
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={formData.notitiesVerborgen}
+                      onChange={e => setFormData(f => ({ ...f, notitiesVerborgen: e.target.checked }))}
+                      className="w-4 h-4 rounded border-warm-300 accent-accent"
+                    />
+                    <span className="text-xs text-warm-500 group-hover:text-warm-700 transition-colors">Aantekeningen verborgen in de PDF</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
+                  <textarea
+                    value={formData.priveNotities}
+                    onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
+                    rows={2}
+                    placeholder="Enkel voor jou, niet voor de gast..."
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Right column — Contactgegevens */}
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Contactgegevens</p>
+
+                {/* Taal */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Taal</label>
+                  <select
+                    value={formData.taal}
+                    onChange={e => setFormData(f => ({ ...f, taal: e.target.value }))}
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
+                  >
+                    <option value="">Niet opgegeven</option>
+                    {TAAL_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">E-mail</label>
+                  <input
+                    type="email"
+                    value={formData.gastEmail}
+                    onChange={e => setFormData(f => ({ ...f, gastEmail: e.target.value }))}
+                    placeholder="jan@voorbeeld.be"
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+
+                {/* Telefoon */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Telefoon</label>
+                  <input
+                    type="tel"
+                    value={formData.gastTelefoon}
+                    onChange={e => setFormData(f => ({ ...f, gastTelefoon: e.target.value }))}
+                    placeholder="+32 470 00 00 00"
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+
+                {/* Personen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Volwassenen</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formData.aantalVolwassenen}
+                      onChange={e => setFormData(f => ({ ...f, aantalVolwassenen: e.target.value }))}
+                      placeholder="—"
+                      className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Kinderen</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formData.aantalKinderen}
+                      onChange={e => setFormData(f => ({ ...f, aantalKinderen: e.target.value }))}
+                      placeholder="—"
+                      className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Adresgegevens toggle */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setContactInfoOpen(v => !v)}
+                    className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium transition-colors"
+                  >
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      className={`transition-transform ${contactInfoOpen ? "rotate-90" : ""}`}
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                    Meer contactinfo
+                  </button>
+                  {contactInfoOpen && (
+                    <div className="mt-3 space-y-3">
+                      <input
+                        type="text"
+                        value={formData.gastAdres}
+                        onChange={e => setFormData(f => ({ ...f, gastAdres: e.target.value }))}
+                        placeholder="Adres"
+                        className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          value={formData.gastPostcode}
+                          onChange={e => setFormData(f => ({ ...f, gastPostcode: e.target.value }))}
+                          placeholder="Postcode"
+                          className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={formData.gastGemeente}
+                          onChange={e => setFormData(f => ({ ...f, gastGemeente: e.target.value }))}
+                          placeholder="Gemeente"
+                          className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.gastLand}
+                        onChange={e => setFormData(f => ({ ...f, gastLand: e.target.value }))}
+                        placeholder="Land"
+                        className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-warm-100">
               <button onClick={cancelModal} className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-xl text-sm hover:bg-warm-50 transition-colors">
                 Annuleren
               </button>
@@ -1232,109 +1609,365 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
         </div>
       )}
 
-      {/* Modal: reservatie bewerken */}
+      {/* ============================================================
+          MODAL: reservatie bewerken (huurkalender.nl style, two-column)
+          ============================================================ */}
       {modal === "edit" && editingBooking && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={cancelModal}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-warm-900 mb-1">Reservatie bewerken</h3>
-            <p className="text-sm text-warm-500 mb-5">
-              {format(parseISO(editingBooking.start_datum), "d MMMM", { locale: nl })} t/m {format(parseISO(editingBooking.eind_datum), "d MMMM yyyy", { locale: nl })}
-            </p>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6" onClick={cancelModal}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-warm-100">
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Gastnaam</label>
-                <input
-                  type="text"
-                  value={formData.gastNaam}
-                  onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
-                  placeholder="Jan Janssen"
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
-                <div className="flex gap-2">
-                  {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setFormData(f => ({ ...f, status: s }))}
-                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        formData.status === s
-                          ? `${STATUS_COLORS[s].bg} ${STATUS_COLORS[s].text}`
-                          : "bg-warm-50 text-warm-500 hover:bg-warm-100"
-                      }`}
-                    >
-                      {STATUS_LABELS[s]}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="text-lg font-bold text-warm-900">
+                    Boeking #{formData.boekingNummerExtern || editingBooking.id.slice(0, 8).toUpperCase()}
+                  </h3>
+                  {editingBooking.bron && editingBooking.bron !== "import" && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BRON_COLORS[editingBooking.bron] ?? "bg-warm-100 text-warm-600"}`}>
+                      {BRON_LABELS[editingBooking.bron] ?? editingBooking.bron}
+                    </span>
+                  )}
                 </div>
+                <p className="text-sm text-warm-400">{calendar.naam}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Publieke aantekeningen</label>
-                <textarea
-                  value={formData.notities}
-                  onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
-                  rows={2}
-                  placeholder="Zichtbaar op de boekingsbevestiging voor de gast..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
-                <textarea
-                  value={formData.priveNotities}
-                  onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
-                  rows={2}
-                  placeholder="Enkel zichtbaar voor jou, niet voor de gast..."
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst</label>
-                <select
-                  value={formData.bron}
-                  onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
-                  className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
-                >
-                  {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              {/* Prijsopbouw */}
-              <div className="pt-2 border-t border-warm-100">
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">Huurprijs per nacht (optioneel)</label>
-                <div className="relative max-w-[160px]">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+              <button onClick={cancelModal} className="w-8 h-8 rounded-lg hover:bg-warm-100 flex items-center justify-center text-warm-400 transition-colors shrink-0 mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-warm-100">
+              {/* ---- LEFT COLUMN ---- */}
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Boeking</p>
+
+                {/* Gast naam */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Gastnaam</label>
                   <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={formData.facturatiePrijs}
-                    onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
-                    placeholder="—"
-                    className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    type="text"
+                    value={formData.gastNaam}
+                    onChange={e => setFormData(f => ({ ...f, gastNaam: e.target.value }))}
+                    placeholder="Jan Janssen"
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    autoFocus
                   />
                 </div>
-                {(() => {
-                  const nachten = Math.round(
-                    (new Date(editingBooking.eind_datum).getTime() - new Date(editingBooking.start_datum).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  const prijs = formData.facturatiePrijs ? Number(formData.facturatiePrijs) : null;
-                  return (
-                    <p className="text-xs text-warm-500 mt-1.5">
-                      {nachten} nacht{nachten !== 1 ? "en" : ""}
-                      {prijs != null ? (
-                        <> × €{prijs} = <span className="font-semibold text-warm-800">€{(prijs * nachten).toFixed(2)}</span></>
-                      ) : (
-                        <span className="text-warm-300"> — geen prijs ingevuld</span>
-                      )}
-                    </p>
-                  );
-                })()}
+
+                {/* Aankomst & vertrek datums + tijden */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Aankomst</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-warm-700 bg-warm-50 border border-warm-200 rounded-xl px-3 py-2.5 flex-1 font-medium">
+                      {format(parseISO(editingBooking.start_datum), "EEE d MMMM yyyy", { locale: nl })}
+                    </span>
+                    <input
+                      type="time"
+                      value={formData.checkInTijd}
+                      onChange={e => setFormData(f => ({ ...f, checkInTijd: e.target.value }))}
+                      className="w-28 border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                  {formData.checkInTijd === "12:00" && (
+                    <p className="text-xs text-warm-400 mt-1">halve dag</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Vertrek</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-warm-700 bg-warm-50 border border-warm-200 rounded-xl px-3 py-2.5 flex-1 font-medium">
+                      {format(parseISO(editingBooking.eind_datum), "EEE d MMMM yyyy", { locale: nl })}
+                    </span>
+                    <input
+                      type="time"
+                      value={formData.checkUitTijd}
+                      onChange={e => setFormData(f => ({ ...f, checkUitTijd: e.target.value }))}
+                      className="w-28 border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Nachten */}
+                <div className="flex items-center justify-between py-2 border-t border-b border-warm-100">
+                  <span className="text-sm text-warm-500">Aantal nachten</span>
+                  <span className="text-sm font-semibold text-warm-800">
+                    {calcNachten(editingBooking.start_datum, editingBooking.eind_datum)}
+                  </span>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
+                  <div className="flex gap-2">
+                    {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, status: s }))}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          formData.status === s
+                            ? `${STATUS_COLORS[s].bg} ${STATUS_COLORS[s].text}`
+                            : "bg-warm-50 text-warm-500 hover:bg-warm-100"
+                        }`}
+                      >
+                        {STATUS_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bron dropdown */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Herkomst</label>
+                  <select
+                    value={formData.bron}
+                    onChange={e => setFormData(f => ({ ...f, bron: e.target.value }))}
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
+                  >
+                    {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Prijzen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Totaalprijs</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={formData.prijsTotaal}
+                        onChange={e => setFormData(f => ({ ...f, prijsTotaal: e.target.value }))}
+                        placeholder="—"
+                        className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Prijs/nacht</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">€</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={formData.facturatiePrijs}
+                        onChange={e => setFormData(f => ({ ...f, facturatiePrijs: e.target.value }))}
+                        placeholder="—"
+                        className="w-full border border-warm-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notities */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Aantekeningen</label>
+                  <textarea
+                    value={formData.notities}
+                    onChange={e => setFormData(f => ({ ...f, notities: e.target.value }))}
+                    rows={3}
+                    placeholder="Zichtbaar op de boekingsbevestiging voor de gast..."
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                  />
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={formData.notitiesVerborgen}
+                      onChange={e => setFormData(f => ({ ...f, notitiesVerborgen: e.target.checked }))}
+                      className="w-4 h-4 rounded border-warm-300 accent-accent"
+                    />
+                    <span className="text-xs text-warm-500 group-hover:text-warm-700 transition-colors">Aantekeningen verborgen in de PDF</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Privé aantekeningen</label>
+                  <textarea
+                    value={formData.priveNotities}
+                    onChange={e => setFormData(f => ({ ...f, priveNotities: e.target.value }))}
+                    rows={2}
+                    placeholder="Enkel zichtbaar voor jou, niet voor de gast..."
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* ---- RIGHT COLUMN — Contactgegevens ---- */}
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Contactgegevens</p>
+
+                {/* Gast naam (read-only label) */}
+                {formData.gastNaam && (
+                  <p className="text-base font-semibold text-warm-900">{formData.gastNaam}</p>
+                )}
+
+                {/* Taal */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Taal</label>
+                  <select
+                    value={formData.taal}
+                    onChange={e => setFormData(f => ({ ...f, taal: e.target.value }))}
+                    className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
+                  >
+                    <option value="">Niet opgegeven</option>
+                    {TAAL_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Bekijk vorige boekingen */}
+                {editingBooking.gast_email && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cancelModal();
+                      setZoekQuery(editingBooking.gast_email || "");
+                      setZoekOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 border border-warm-200 text-warm-700 hover:bg-warm-50 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    Bekijk vorige boekingen
+                  </button>
+                )}
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">E-mail</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={formData.gastEmail}
+                      onChange={e => setFormData(f => ({ ...f, gastEmail: e.target.value }))}
+                      placeholder="jan@voorbeeld.be"
+                      className="flex-1 border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                    {formData.gastEmail && (
+                      <a
+                        href={`mailto:${formData.gastEmail}`}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl border border-warm-200 text-accent hover:bg-accent-light transition-colors shrink-0"
+                        title="Stuur e-mail"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                          <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Telefoon */}
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Telefoon</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="tel"
+                      value={formData.gastTelefoon}
+                      onChange={e => setFormData(f => ({ ...f, gastTelefoon: e.target.value }))}
+                      placeholder="+32 470 00 00 00"
+                      className="flex-1 border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                    {formData.gastTelefoon && (
+                      <a
+                        href={`tel:${formData.gastTelefoon}`}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl border border-warm-200 text-accent hover:bg-accent-light transition-colors shrink-0"
+                        title="Bel op"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.58 4.4 2 2 0 0 1 3.55 2.24h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l.85-.85a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Personen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Volwassenen</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formData.aantalVolwassenen}
+                      onChange={e => setFormData(f => ({ ...f, aantalVolwassenen: e.target.value }))}
+                      placeholder="—"
+                      className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-1.5">Kinderen</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formData.aantalKinderen}
+                      onChange={e => setFormData(f => ({ ...f, aantalKinderen: e.target.value }))}
+                      placeholder="—"
+                      className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Adres toggle */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setContactInfoOpen(v => !v)}
+                    className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium transition-colors"
+                  >
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      className={`transition-transform ${contactInfoOpen ? "rotate-90" : ""}`}
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                    Meer contactinfo
+                  </button>
+                  {contactInfoOpen && (
+                    <div className="mt-3 space-y-3">
+                      <input
+                        type="text"
+                        value={formData.gastAdres}
+                        onChange={e => setFormData(f => ({ ...f, gastAdres: e.target.value }))}
+                        placeholder="Adres"
+                        className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          value={formData.gastPostcode}
+                          onChange={e => setFormData(f => ({ ...f, gastPostcode: e.target.value }))}
+                          placeholder="Postcode"
+                          className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={formData.gastGemeente}
+                          onChange={e => setFormData(f => ({ ...f, gastGemeente: e.target.value }))}
+                          placeholder="Gemeente"
+                          className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.gastLand}
+                        onChange={e => setFormData(f => ({ ...f, gastLand: e.target.value }))}
+                        placeholder="Land"
+                        className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-warm-100">
               <button onClick={handleDelete} disabled={saving} className="py-2.5 px-4 border border-red-200 text-red-600 font-medium rounded-xl text-sm hover:bg-red-50 transition-colors disabled:opacity-60">
                 Verwijderen
               </button>

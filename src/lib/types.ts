@@ -174,14 +174,27 @@ export interface Calendar {
 export interface Booking {
   id: string;
   calendar_id: string;
-  start_datum: string; // YYYY-MM-DD
-  eind_datum: string;  // YYYY-MM-DD
+  start_datum: string;
+  eind_datum: string;
   gast_naam: string | null;
+  gast_email?: string | null;
+  gast_telefoon?: string | null;
+  gast_adres?: string | null;
+  gast_postcode?: string | null;
+  gast_gemeente?: string | null;
+  gast_land?: string | null;
+  taal?: string | null;
+  aantal_volwassenen?: number | null;
+  aantal_kinderen?: number | null;
+  check_in_tijd?: string | null;
+  check_uit_tijd?: string | null;
   status: BookingStatus;
   notities: string | null;
   prive_notities?: string | null;
   bron: BookingBron;
+  prijs_totaal?: number | null;
   facturatie_prijs?: number | null;
+  boeking_nummer_extern?: string | null;
   created_at: string;
 }
 

@@ -27,7 +27,7 @@ export default async function KalenderPage({ params }: { params: Promise<{ id: s
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("*")
+    .select("id, calendar_id, start_datum, eind_datum, gast_naam, gast_email, gast_telefoon, gast_adres, gast_postcode, gast_gemeente, gast_land, taal, aantal_volwassenen, aantal_kinderen, check_in_tijd, check_uit_tijd, status, notities, prive_notities, bron, prijs_totaal, facturatie_prijs, boeking_nummer_extern, created_at")
     .eq("calendar_id", id)
     .order("start_datum", { ascending: true });
 
