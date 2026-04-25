@@ -40,15 +40,25 @@ interface Props {
 const BRON_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Onbekend" },
   { value: "eigen_website", label: "Eigen website" },
-  { value: "vakantiewoningen_be", label: "vakantiewoningen-in-belgie.be" },
+  { value: "vakantiewoningen_be", label: "Vakantiewoningen-in-België" },
   { value: "rechtstreeks", label: "Rechtstreeks (telefoon / mail)" },
+  { value: "vipio", label: "Vipio" },
+  { value: "booking_com", label: "Booking.com" },
+  { value: "airbnb", label: "Airbnb / VRBO" },
+  { value: "naturhuisje", label: "Natuurhuisje" },
+  { value: "micazu", label: "Micazu" },
   { value: "andere", label: "Andere" },
 ];
 
 const BRON_LABELS: Record<string, string> = {
   eigen_website: "Eigen website",
-  vakantiewoningen_be: "vakantiewoningen-in-belgie.be",
+  vakantiewoningen_be: "Vakantiewoningen-in-België",
   rechtstreeks: "Rechtstreeks",
+  vipio: "Vipio",
+  booking_com: "Booking.com",
+  airbnb: "Airbnb / VRBO",
+  naturhuisje: "Natuurhuisje",
+  micazu: "Micazu",
   import: "iCal import",
   andere: "Andere",
 };
@@ -57,6 +67,11 @@ const BRON_COLORS: Record<string, string> = {
   eigen_website: "bg-accent text-white",
   vakantiewoningen_be: "bg-green-500 text-white",
   rechtstreeks: "bg-warm-600 text-white",
+  vipio: "bg-purple-500 text-white",
+  booking_com: "bg-blue-500 text-white",
+  airbnb: "bg-red-500 text-white",
+  naturhuisje: "bg-emerald-500 text-white",
+  micazu: "bg-orange-500 text-white",
   import: "bg-warm-300 text-warm-800",
   andere: "bg-warm-200 text-warm-700",
 };
