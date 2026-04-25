@@ -48,6 +48,7 @@ const BRON_OPTIONS: { value: string; label: string }[] = [
   { value: "airbnb", label: "Airbnb / VRBO" },
   { value: "naturhuisje", label: "Natuurhuisje" },
   { value: "micazu", label: "Micazu" },
+  { value: "import", label: "iCal import" },
   { value: "andere", label: "Andere" },
 ];
 
