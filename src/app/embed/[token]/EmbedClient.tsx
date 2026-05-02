@@ -18,8 +18,8 @@ interface Props {
 }
 
 const STATUS_STYLE = {
-  bezet: "bg-red-100 text-red-700",
-  optie: "bg-amber-100 text-amber-700",
+  bezet: "bg-blue-100 text-blue-700",
+  optie: "bg-cyan-100 text-cyan-700",
   geblokkeerd: "bg-warm-100 text-warm-500",
 };
 
@@ -85,8 +85,8 @@ export default function EmbedClient({ kalenderNaam, woningNaam, kleur, bookings 
 
           {/* Legend */}
           <div className="flex gap-3 mt-3 pt-3 border-t border-warm-50 text-xs text-warm-400 justify-center">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-100 inline-block" />Bezet</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-100 inline-block" />Optie</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-blue-100 inline-block" />Bezet</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-cyan-100 inline-block" />Optie</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded inline-block bg-warm-50 border border-warm-100" />Vrij</span>
           </div>
         </div>

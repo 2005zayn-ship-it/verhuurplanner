@@ -44,8 +44,8 @@ function getStatusForDay(date: Date, bookings: PublicBooking[]): "bezet" | "opti
 }
 
 const STATUS_STYLE: Record<"bezet" | "optie" | "geblokkeerd", string> = {
-  bezet: "bg-red-100 text-red-700",
-  optie: "bg-amber-100 text-amber-700",
+  bezet: "bg-blue-100 text-blue-700",
+  optie: "bg-cyan-100 text-cyan-700",
   geblokkeerd: "bg-warm-100 text-warm-500",
 };
 
@@ -145,11 +145,11 @@ export default async function BeschikbaarheidPage({ params }: PageProps) {
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mb-6 text-sm text-warm-600">
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" />
+            <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200 inline-block" />
             Bezet
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" />
+            <span className="w-3 h-3 rounded bg-cyan-100 border border-cyan-200 inline-block" />
             Optie
           </span>
           <span className="flex items-center gap-2">
