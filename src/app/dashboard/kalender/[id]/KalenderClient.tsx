@@ -240,6 +240,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   }
 
   // --- Day cell style calculation ---
+  // Vertical split: checkout = left half, checkin = right half (industry standard)
   function getDayCellStyle(
     dateStr: string,
     arrivalBooking: Booking | null,
@@ -252,18 +253,15 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     if (arrivalBooking && departureBooking) {
       const depColor = STATUS_HEX[departureBooking.status];
       const arrColor = STATUS_HEX[arrivalBooking.status];
-      // White 2px line at diagonal for clear visual separation
-      return {
-        background: `linear-gradient(to top left, ${depColor} calc(50% - 1px), white calc(50% - 1px), white calc(50% + 1px), ${arrColor} calc(50% + 1px))`,
-      };
+      return { background: `linear-gradient(to right, ${depColor} 50%, ${arrColor} 50%)` };
     }
     if (arrivalBooking) {
       const color = STATUS_HEX[arrivalBooking.status];
-      return { background: `linear-gradient(to top left, ${color} calc(50% - 1px), transparent calc(50% - 1px))` };
+      return { background: `linear-gradient(to right, transparent 50%, ${color} 50%)` };
     }
     if (departureBooking) {
       const color = STATUS_HEX[departureBooking.status];
-      return { background: `linear-gradient(to top left, transparent calc(50% + 1px), ${color} calc(50% + 1px))` };
+      return { background: `linear-gradient(to right, ${color} 50%, transparent 50%)` };
     }
     return {};
   }
@@ -680,8 +678,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                           !isCurrentMonth ? "text-warm-200 opacity-30" : "",
                           isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
                           isCurrentMonth && !hasAnyBooking && inSel ? "bg-accent/15 text-accent" : "",
-                          isCurrentMonth && hasAnyBooking && !arrivalBooking && !departureBooking ? "text-white" : "",
-                          isCurrentMonth && hasAnyBooking && (arrivalBooking || departureBooking) ? "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]" : "",
+                          isCurrentMonth && fullBooking && !arrivalBooking && !departureBooking ? "text-white" : "",
+                          isCurrentMonth && (arrivalBooking || departureBooking) ? "text-warm-800 font-semibold" : "",
                           isPastDay && isCurrentMonth ? "opacity-50" : "",
                           isHighlighted ? "ring-2 ring-accent ring-offset-1 rounded-md" : "",
                         ].filter(Boolean).join(" ")}
