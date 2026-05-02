@@ -580,27 +580,29 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const yearLabel = format(month, "yyyy");
     const monthNumber = format(month, "MM");
 
-    // gridTemplateColumns: week-num col (auto) + 7 equal day cols (1fr each)
-    const colTemplate = "24px repeat(7, 1fr)";
+    // Vaste 36px cellen — kaart krijgt natuurlijke breedte, witruimte rechts zoals huurkalender.nl
+    const CELL = 36; // px — change hier voor grotere/kleinere cellen
+    const WEEKCOL = 22; // px
+    const colTemplate = `${WEEKCOL}px repeat(7, ${CELL}px)`;
 
     return (
-      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-xl overflow-hidden min-w-0">
+      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-xl overflow-hidden shrink-0" style={{ width: WEEKCOL + 7 * CELL + 2 }}>
         {/* Month header */}
-        <div className="relative px-3 py-2 border-b border-warm-100">
+        <div className="relative px-2 py-1.5 border-b border-warm-100">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-warm-900 capitalize">{monthLabel}</span>
-            <span className="text-xs text-warm-400">{yearLabel}</span>
+            <span className="text-xs font-bold text-warm-900 capitalize">{monthLabel}</span>
+            <span className="text-[10px] text-warm-400">{yearLabel}</span>
           </div>
-          <span className="absolute top-0 right-2 text-5xl font-black text-warm-100 select-none leading-none pointer-events-none">
+          <span className="absolute top-0 right-1.5 text-3xl font-black text-warm-100 select-none leading-none pointer-events-none">
             {monthNumber}
           </span>
         </div>
 
         {/* Day name headers */}
         <div className="grid border-b border-warm-100 bg-warm-50" style={{ gridTemplateColumns: colTemplate }}>
-          <div className="h-6" />
+          <div style={{ width: WEEKCOL, height: 22 }} />
           {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
-            <div key={d} className="h-6 flex items-center justify-center text-[10px] font-semibold text-warm-500">{d}</div>
+            <div key={d} style={{ width: CELL, height: 22 }} className="flex items-center justify-center text-[9px] font-semibold text-warm-500">{d}</div>
           ))}
         </div>
 
@@ -616,11 +618,11 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               style={{ gridTemplateColumns: colTemplate }}
             >
               {/* Week number */}
-              <div className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
+              <div style={{ width: WEEKCOL, height: CELL }} className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
                 {weekNum}
               </div>
 
-              {/* Day cells */}
+              {/* Day cells — exact square via inline width+height */}
               {weekDays.map(day => {
                 const isCurrentMonth = day.getMonth() === month.getMonth();
                 const dateStr = format(day, "yyyy-MM-dd");
@@ -656,7 +658,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     }}
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
-                      "relative aspect-square flex items-center justify-center text-xs font-medium select-none transition-colors",
+                      "relative flex items-center justify-center text-[11px] font-medium select-none transition-colors",
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
@@ -666,7 +668,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       isPastDay && isCurrentMonth ? "opacity-40" : "",
                       isHighlighted ? "ring-2 ring-inset ring-accent" : "",
                     ].filter(Boolean).join(" ")}
-                    style={isCurrentMonth ? cellStyle : {}}
+                    style={{ width: CELL, height: CELL, ...(isCurrentMonth ? cellStyle : {}) }}
                   >
                     <span className="relative z-10 leading-none">{format(day, "d")}</span>
 
@@ -678,7 +680,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     )}
 
                     {isCurrentMonth && primaryBooking?.gast_naam && dateStr === primaryBooking.start_datum && (
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-60 pointer-events-none z-10" />
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-60 pointer-events-none z-10" />
                     )}
                   </div>
                 );
@@ -882,11 +884,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </button>
           </div>
 
-          {/* Multi-month calendar grid — fills full width, equal columns like huurkalender.nl */}
-          <div
-            className={`grid gap-3 mb-4${aantalMaanden === 1 ? " max-w-sm" : ""}`}
-            style={{ gridTemplateColumns: `repeat(${aantalMaanden === 1 ? 1 : aantalMaanden === 2 ? 2 : aantalMaanden === 4 ? 4 : aantalMaanden <= 6 ? 3 : 4}, 1fr)` }}
-          >
+          {/* Multi-month calendar — vaste kaartbreedte, witruimte rechts zoals huurkalender.nl */}
+          <div className="flex flex-wrap gap-3 mb-4">
             {months.map(m => renderMonth(m))}
           </div>
 
