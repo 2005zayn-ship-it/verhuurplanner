@@ -278,18 +278,19 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     if (fullBooking && !arrivalBooking && !departureBooking) {
       return { backgroundColor: STATUS_HEX[fullBooking.status] };
     }
+    // Diagonale split: vertrek = linksboven driehoek, aankomst = rechtsonder driehoek
     if (arrivalBooking && departureBooking) {
-      const depColor = STATUS_HEX[departureBooking.status];
-      const arrColor = STATUS_HEX[arrivalBooking.status];
-      return { background: `linear-gradient(to right, ${depColor} 50%, ${arrColor} 50%)` };
+      const dep = STATUS_HEX[departureBooking.status];
+      const arr = STATUS_HEX[arrivalBooking.status];
+      return { background: `linear-gradient(to bottom right, ${dep} 50%, ${arr} 50%)` };
     }
     if (arrivalBooking) {
       const color = STATUS_HEX[arrivalBooking.status];
-      return { background: `linear-gradient(to right, transparent 50%, ${color} 50%)` };
+      return { background: `linear-gradient(to bottom right, transparent 50%, ${color} 50%)` };
     }
     if (departureBooking) {
       const color = STATUS_HEX[departureBooking.status];
-      return { background: `linear-gradient(to right, ${color} 50%, transparent 50%)` };
+      return { background: `linear-gradient(to bottom right, ${color} 50%, transparent 50%)` };
     }
     return {};
   }
@@ -692,7 +693,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     }}
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
-                      "relative h-8 flex items-center justify-center select-none transition-colors",
+                      "relative h-10 flex items-center justify-center select-none transition-colors",
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50" : "",
@@ -925,22 +926,13 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </button>
           </div>
 
-          {/* Multi-month calendar — gecentreerd met witruimte links/rechts zoals huurkalender.nl */}
-          {(() => {
-            const cols = Math.min(aantalMaanden, 4);
-            const maxW = cols * 280 + (cols - 1) * 12;
-            return (
-              <div
-                className="grid gap-3 mb-4 mx-auto w-full"
-                style={{
-                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                  maxWidth: `${maxW}px`,
-                }}
-              >
-                {months.map(m => renderMonth(m))}
-              </div>
-            );
-          })()}
+          {/* Multi-month calendar — volledige breedte, max 4 kolommen */}
+          <div
+            className="grid gap-3 mb-4"
+            style={{ gridTemplateColumns: `repeat(${Math.min(aantalMaanden, 4)}, 1fr)` }}
+          >
+            {months.map(m => renderMonth(m))}
+          </div>
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-warm-500 mb-6 px-1">
@@ -959,18 +951,34 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             <span className="text-warm-400 ml-auto hidden sm:block">Klik op een datum om een reservatie toe te voegen</span>
           </div>
 
-          {/* Upcoming bookings */}
+          {/* Upcoming bookings — standaard ingeklapt */}
           <div className="bg-white rounded-2xl border border-warm-100 shadow-sm">
-            <div className="px-6 py-4 border-b border-warm-100">
-              <h3 className="text-sm font-semibold text-warm-700">Komende reservaties</h3>
-            </div>
-            <div className="px-6 py-4">
-              {komende.length === 0 ? (
-                <p className="text-sm text-warm-400">Nog geen reservaties gepland.</p>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    {(toonMeerReservaties ? komende : komende.slice(0, 10)).map(b => (
+            <button
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-warm-50 transition-colors rounded-2xl"
+              onClick={() => setToonMeerReservaties(v => !v)}
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-warm-700">Komende reservaties</h3>
+                {komende.length > 0 && (
+                  <span className="text-xs font-medium bg-accent-light text-accent px-2 py-0.5 rounded-full">
+                    {komende.length}
+                  </span>
+                )}
+              </div>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                className={`text-warm-400 transition-transform ${toonMeerReservaties ? "rotate-180" : ""}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {toonMeerReservaties && (
+              <div className="px-6 pb-4 border-t border-warm-100">
+                {komende.length === 0 ? (
+                  <p className="text-sm text-warm-400 pt-4">Nog geen reservaties gepland.</p>
+                ) : (
+                  <div className="space-y-2 pt-3">
+                    {komende.map(b => (
                       <div key={b.id} className="flex items-center gap-3 py-1.5">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_HEX[b.status] }} />
                         <span className="text-sm text-warm-700 font-medium min-w-[150px]">
@@ -991,17 +999,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       </div>
                     ))}
                   </div>
-                  {komende.length > 10 && (
-                    <button
-                      onClick={() => setToonMeerReservaties(v => !v)}
-                      className="mt-3 text-sm text-accent hover:text-accent-hover font-medium transition-colors"
-                    >
-                      {toonMeerReservaties ? "Minder tonen" : `Meer tonen (${komende.length - 10} overige)`}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Herkomst statistieken */}
