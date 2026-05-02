@@ -575,138 +575,117 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   function renderMonth(month: Date) {
     const mStart = startOfMonth(month);
     const mEnd = endOfMonth(month);
-    const weeks = eachWeekOfInterval(
-      { start: mStart, end: mEnd },
-      { weekStartsOn: 1 }
-    );
-
+    const weeks = eachWeekOfInterval({ start: mStart, end: mEnd }, { weekStartsOn: 1 });
     const monthLabel = format(month, "MMMM", { locale: nl });
     const yearLabel = format(month, "yyyy");
     const monthNumber = format(month, "MM");
 
+    // gridTemplateColumns: week-num col (auto) + 7 equal day cols (1fr each)
+    const colTemplate = "24px repeat(7, 1fr)";
+
     return (
-      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-2xl overflow-hidden shrink-0" style={{ width: 248 }}>
+      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-xl overflow-hidden min-w-0">
         {/* Month header */}
-        <div className="relative px-3 pt-3 pb-2 border-b border-warm-100 bg-warm-50">
+        <div className="relative px-3 py-2 border-b border-warm-100">
           <div className="flex items-baseline gap-1.5">
             <span className="text-sm font-bold text-warm-900 capitalize">{monthLabel}</span>
             <span className="text-xs text-warm-400">{yearLabel}</span>
           </div>
-          <span className="absolute top-1 right-3 text-4xl font-black text-warm-100 select-none leading-none pointer-events-none">
+          <span className="absolute top-0 right-2 text-5xl font-black text-warm-100 select-none leading-none pointer-events-none">
             {monthNumber}
           </span>
         </div>
 
-        {/* Day headers + week number column — fixed 30px cols so size never changes */}
-        <div className="px-1 pt-1 overflow-x-auto">
-          <div className="grid gap-x-px mb-px" style={{ gridTemplateColumns: "18px repeat(7, 30px)" }}>
-            <div className="text-center text-[9px] text-warm-300 font-medium py-0.5">W</div>
-            {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
-              <div key={d} className="text-center text-[9px] font-semibold text-warm-500 py-0.5">{d}</div>
-            ))}
-          </div>
-
-          {/* Weeks */}
-          <div className="space-y-px pb-1">
-            {weeks.map(weekStart => {
-              const weekDays = eachDayOfInterval({
-                start: weekStart,
-                end: endOfWeek(weekStart, { weekStartsOn: 1 }),
-              });
-              const weekNum = getISOWeek(weekStart);
-
-              return (
-                <div key={weekStart.toISOString()} className="grid gap-x-px" style={{ gridTemplateColumns: "18px repeat(7, 30px)" }}>
-                  {/* Week number */}
-                  <div className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none h-7 w-[18px]">
-                    {weekNum}
-                  </div>
-
-                  {/* Days */}
-                  {weekDays.map(day => {
-                    const isCurrentMonth = day.getMonth() === month.getMonth();
-                    const dateStr = format(day, "yyyy-MM-dd");
-                    const dayBookings = getBookingsForDay(dateStr);
-
-                    const fullBookings = dayBookings.filter(
-                      b => dateStr > b.start_datum && dateStr < b.eind_datum
-                    );
-                    const arrivalBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr !== b.eind_datum);
-                    const departureBookings = dayBookings.filter(b => dateStr === b.eind_datum && dateStr !== b.start_datum);
-                    const sameDayBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr === b.eind_datum);
-
-                    const fullBooking = fullBookings[0] ?? sameDayBookings[0] ?? null;
-                    const arrivalBooking = arrivalBookings[0] ?? null;
-                    const departureBooking = departureBookings[0] ?? null;
-                    const hasAnyBooking = dayBookings.length > 0;
-
-                    // Pick the booking to associate with hover/click (prefer full, then arrival, then departure)
-                    const primaryBooking = fullBooking ?? arrivalBooking ?? departureBooking ?? null;
-
-                    const inSel = isInSelection(day);
-                    const isTod = isToday(day);
-                    const isPastDay = isPast(day) && !isToday(day);
-
-                    const isHighlighted =
-                      zoekQuery.trim().length > 0 &&
-                      zoekResultaten.some(
-                        b => dateStr >= b.start_datum && dateStr <= b.eind_datum
-                      );
-
-                    const cellStyle = isCurrentMonth
-                      ? getDayCellStyle(dateStr, arrivalBooking, departureBooking, fullBooking)
-                      : {};
-
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        onClick={() => isCurrentMonth && handleDayClick(day)}
-                        onMouseEnter={e => {
-                          handleDayHover(day);
-                          if (isCurrentMonth && primaryBooking && !selecting) {
-                            showTooltip(primaryBooking, e.currentTarget as HTMLElement);
-                          }
-                        }}
-                        onMouseLeave={() => {
-                          setHoverDate(null);
-                          hideTooltipDelayed();
-                        }}
-                        className={[
-                          "relative flex items-center justify-center text-[11px] font-medium transition-all select-none",
-                          "h-7 w-[30px] rounded-none shrink-0",
-                          isCurrentMonth ? "cursor-pointer" : "cursor-default",
-                          !isCurrentMonth ? "text-warm-200 opacity-30" : "",
-                          isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
-                          isCurrentMonth && !hasAnyBooking && inSel ? "bg-accent/15 text-accent" : "",
-                          isCurrentMonth && fullBooking && !arrivalBooking && !departureBooking ? "text-white" : "",
-                          isCurrentMonth && (arrivalBooking || departureBooking) ? "text-warm-800 font-semibold" : "",
-                          isPastDay && isCurrentMonth ? "opacity-50" : "",
-                          isHighlighted ? "ring-2 ring-accent ring-offset-1 rounded-md" : "",
-                        ].filter(Boolean).join(" ")}
-                        style={isCurrentMonth ? cellStyle : {}}
-                      >
-                        <span className={isTod && isCurrentMonth ? "relative z-10" : ""}>
-                          {format(day, "d")}
-                        </span>
-
-                        {isTod && isCurrentMonth && (
-                          <span
-                            className="absolute inset-0 rounded-none pointer-events-none"
-                            style={{ zIndex: 1, border: "2px solid #2563eb", boxShadow: hasAnyBooking ? "0 0 0 1px white inset" : undefined }}
-                          />
-                        )}
-
-                        {isCurrentMonth && dayBookings.some(b => b.gast_naam && dateStr === b.start_datum) && (
-                          <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-70 pointer-events-none" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+        {/* Day name headers */}
+        <div className="grid border-b border-warm-100 bg-warm-50" style={{ gridTemplateColumns: colTemplate }}>
+          <div className="h-6" />
+          {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
+            <div key={d} className="h-6 flex items-center justify-center text-[10px] font-semibold text-warm-500">{d}</div>
+          ))}
         </div>
+
+        {/* Week rows */}
+        {weeks.map((weekStart, wi) => {
+          const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
+          const weekNum = getISOWeek(weekStart);
+
+          return (
+            <div
+              key={weekStart.toISOString()}
+              className={`grid${wi > 0 ? " border-t border-warm-50" : ""}`}
+              style={{ gridTemplateColumns: colTemplate }}
+            >
+              {/* Week number */}
+              <div className="h-9 flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
+                {weekNum}
+              </div>
+
+              {/* Day cells */}
+              {weekDays.map(day => {
+                const isCurrentMonth = day.getMonth() === month.getMonth();
+                const dateStr = format(day, "yyyy-MM-dd");
+                const dayBookings = getBookingsForDay(dateStr);
+
+                const fullBookings = dayBookings.filter(b => dateStr > b.start_datum && dateStr < b.eind_datum);
+                const arrivalBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr !== b.eind_datum);
+                const departureBookings = dayBookings.filter(b => dateStr === b.eind_datum && dateStr !== b.start_datum);
+                const sameDayBookings = dayBookings.filter(b => dateStr === b.start_datum && dateStr === b.eind_datum);
+
+                const fullBooking = fullBookings[0] ?? sameDayBookings[0] ?? null;
+                const arrivalBooking = arrivalBookings[0] ?? null;
+                const departureBooking = departureBookings[0] ?? null;
+                const hasAnyBooking = dayBookings.length > 0;
+                const primaryBooking = fullBooking ?? arrivalBooking ?? departureBooking ?? null;
+
+                const inSel = isInSelection(day);
+                const isTod = isToday(day);
+                const isPastDay = isPast(day) && !isToday(day);
+                const isHighlighted = zoekQuery.trim().length > 0 && zoekResultaten.some(b => dateStr >= b.start_datum && dateStr <= b.eind_datum);
+
+                const cellStyle = isCurrentMonth ? getDayCellStyle(dateStr, arrivalBooking, departureBooking, fullBooking) : {};
+                const isFull = isCurrentMonth && fullBooking && !arrivalBooking && !departureBooking;
+                const isSplit = isCurrentMonth && (arrivalBooking || departureBooking);
+
+                return (
+                  <div
+                    key={day.toISOString()}
+                    onClick={() => isCurrentMonth && handleDayClick(day)}
+                    onMouseEnter={e => {
+                      handleDayHover(day);
+                      if (isCurrentMonth && primaryBooking && !selecting) showTooltip(primaryBooking, e.currentTarget as HTMLElement);
+                    }}
+                    onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
+                    className={[
+                      "relative h-9 flex items-center justify-center text-[11px] font-medium select-none transition-colors",
+                      isCurrentMonth ? "cursor-pointer" : "cursor-default",
+                      !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
+                      isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
+                      isCurrentMonth && !hasAnyBooking && inSel ? "bg-accent/15 text-accent font-semibold" : "",
+                      isFull ? "text-white" : "",
+                      isSplit ? "text-warm-800 font-semibold" : "",
+                      isPastDay && isCurrentMonth ? "opacity-40" : "",
+                      isHighlighted ? "ring-2 ring-inset ring-accent" : "",
+                    ].filter(Boolean).join(" ")}
+                    style={isCurrentMonth ? cellStyle : {}}
+                  >
+                    <span className="relative z-10 leading-none">{format(day, "d")}</span>
+
+                    {isTod && isCurrentMonth && (
+                      <span
+                        className="absolute inset-0 pointer-events-none z-20"
+                        style={{ border: "2px solid #2563eb", boxShadow: hasAnyBooking ? "0 0 0 1px white inset" : undefined }}
+                      />
+                    )}
+
+                    {isCurrentMonth && primaryBooking?.gast_naam && dateStr === primaryBooking.start_datum && (
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-60 pointer-events-none z-10" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -903,8 +882,11 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </button>
           </div>
 
-          {/* Multi-month calendar grid — flex-wrap so cards keep their natural width */}
-          <div className="flex flex-wrap gap-3 items-start mb-4">
+          {/* Multi-month calendar grid — fills full width, equal columns like huurkalender.nl */}
+          <div
+            className="grid gap-3 mb-4"
+            style={{ gridTemplateColumns: `repeat(${aantalMaanden === 12 ? 4 : aantalMaanden}, 1fr)` }}
+          >
             {months.map(m => renderMonth(m))}
           </div>
 
