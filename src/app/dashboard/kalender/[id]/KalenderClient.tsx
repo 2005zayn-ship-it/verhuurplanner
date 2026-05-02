@@ -216,6 +216,26 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; errors: string[] } | null>(null);
 
+  // Custom statussen/bronnen from profile
+  const [customBronnen, setCustomBronnen] = useState<string[]>([]);
+  const [customStatussen, setCustomStatussen] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadCustomOptions() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("custom_bronnen, custom_statussen")
+        .eq("id", user.id)
+        .single();
+      if (data?.custom_bronnen?.length) setCustomBronnen(data.custom_bronnen);
+      if (data?.custom_statussen?.length) setCustomStatussen(data.custom_statussen);
+    }
+    loadCustomOptions();
+  }, []);
+
   // Cleanup timeouts
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedIcalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,7 +250,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     };
   }, []);
 
-  const embedCode = `<script src="https://www.verhuurplanner.be/embed/${calendar.public_token}.js" async></script>\n<div id="verhuurplanner-${calendar.public_token}"></div>`;
+  const embedCode = `<iframe\n  src="https://www.verhuurplanner.be/embed/${calendar.public_token}"\n  width="100%"\n  height="420"\n  style="border:none;border-radius:12px;"\n  title="Beschikbaarheidskalender"\n  loading="lazy"\n></iframe>`;
   const icalUrl = `https://www.verhuurplanner.be/api/ical/${calendar.public_token}.ics`;
   const beschikbaarheidUrl = `https://www.verhuurplanner.be/beschikbaarheid/${calendar.public_token}`;
 
@@ -449,6 +469,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
 
   async function handleDelete() {
     if (!editingBooking) return;
+    const naam = editingBooking.gast_naam || "deze reservatie";
+    if (!window.confirm(`${naam} verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     setSaving(true);
     const supabase = createClient();
     await supabase.from("bookings").delete().eq("id", editingBooking.id);
@@ -541,7 +563,10 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   const zoekResultaten = useMemo(() => {
     if (!zoekQuery.trim()) return [];
     const q = zoekQuery.toLowerCase();
-    return bookings.filter(b => b.gast_naam?.toLowerCase().includes(q));
+    return bookings.filter(b =>
+      b.gast_naam?.toLowerCase().includes(q) ||
+      b.gast_email?.toLowerCase().includes(q)
+    );
   }, [zoekQuery, bookings]);
 
   // --- Upcoming bookings ---
@@ -1346,7 +1371,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 {/* Status */}
                 <div>
                   <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
                       <button
                         key={s}
@@ -1361,6 +1386,20 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                         {STATUS_LABELS[s]}
                       </button>
                     ))}
+                    {customStatussen.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, status: s as BookingStatus }))}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          formData.status === s
+                            ? "bg-accent/10 text-accent"
+                            : "bg-warm-50 text-warm-500 hover:bg-warm-100"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1373,6 +1412,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                   >
                     {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {customBronnen.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1666,7 +1708,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 {/* Status */}
                 <div>
                   <label className="block text-sm font-medium text-warm-700 mb-1.5">Status</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {(Object.keys(STATUS_LABELS) as BookingStatus[]).map(s => (
                       <button
                         key={s}
@@ -1681,6 +1723,20 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                         {STATUS_LABELS[s]}
                       </button>
                     ))}
+                    {customStatussen.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, status: s as BookingStatus }))}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          formData.status === s
+                            ? "bg-accent/10 text-accent"
+                            : "bg-warm-50 text-warm-500 hover:bg-warm-100"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1693,6 +1749,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     className="w-full border border-warm-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none bg-white"
                   >
                     {BRON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {customBronnen.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                 </div>
 
