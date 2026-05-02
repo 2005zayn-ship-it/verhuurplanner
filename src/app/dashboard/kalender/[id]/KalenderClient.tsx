@@ -86,14 +86,14 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 // Inline style colors for diagonal split rendering
 const STATUS_HEX: Record<BookingStatus, string> = {
-  bezet: "#2563eb",
-  optie: "#06b6d4",
-  geblokkeerd: "#94a3b8",
+  bezet: "#f07e6f",
+  optie: "#f59e0b",
+  geblokkeerd: "#9ca3af",
 };
 
 const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; dot: string }> = {
-  bezet: { bg: "bg-blue-100", text: "text-blue-700", dot: "bg-blue-500" },
-  optie: { bg: "bg-cyan-100", text: "text-cyan-700", dot: "bg-cyan-500" },
+  bezet: { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-400" },
+  optie: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-400" },
   geblokkeerd: { bg: "bg-warm-100", text: "text-warm-500", dot: "bg-warm-400" },
 };
 
@@ -587,7 +587,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const monthNumber = format(month, "MM");
 
     return (
-      <div key={month.toISOString()} className="flex-1 min-w-0 bg-white border border-warm-100 rounded-2xl overflow-hidden">
+      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-2xl overflow-hidden" style={{ minWidth: 240 }}>
         {/* Month header */}
         <div className="relative px-3 pt-3 pb-2 border-b border-warm-100 bg-warm-50">
           <div className="flex items-baseline gap-1.5">
@@ -599,17 +599,17 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           </span>
         </div>
 
-        {/* Day headers + week number column */}
-        <div className="px-2 pt-2">
-          <div className="grid grid-cols-[20px_repeat(7,1fr)] gap-x-0 mb-0.5">
-            <div className="text-center text-[10px] text-warm-300 font-medium py-0.5">W</div>
+        {/* Day headers + week number column — fixed 30px cols so size never changes */}
+        <div className="px-1 pt-1 overflow-x-auto">
+          <div className="grid gap-x-px mb-px" style={{ gridTemplateColumns: "18px repeat(7, 30px)" }}>
+            <div className="text-center text-[9px] text-warm-300 font-medium py-0.5">W</div>
             {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map(d => (
-              <div key={d} className="text-center text-[10px] font-semibold text-[#2563eb] py-0.5 opacity-70">{d}</div>
+              <div key={d} className="text-center text-[9px] font-semibold text-warm-500 py-0.5">{d}</div>
             ))}
           </div>
 
           {/* Weeks */}
-          <div className="space-y-0 pb-2">
+          <div className="space-y-px pb-1">
             {weeks.map(weekStart => {
               const weekDays = eachDayOfInterval({
                 start: weekStart,
@@ -618,9 +618,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               const weekNum = getISOWeek(weekStart);
 
               return (
-                <div key={weekStart.toISOString()} className="grid grid-cols-[20px_repeat(7,1fr)] gap-x-0">
+                <div key={weekStart.toISOString()} className="grid gap-x-px" style={{ gridTemplateColumns: "18px repeat(7, 30px)" }}>
                   {/* Week number */}
-                  <div className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none h-7">
+                  <div className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none h-7 w-[18px]">
                     {weekNum}
                   </div>
 
@@ -675,7 +675,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                         }}
                         className={[
                           "relative flex items-center justify-center text-[11px] font-medium transition-all select-none",
-                          "h-7 rounded-none",
+                          "h-7 w-[30px] rounded-none shrink-0",
                           isCurrentMonth ? "cursor-pointer" : "cursor-default",
                           !isCurrentMonth ? "text-warm-200 opacity-30" : "",
                           isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
