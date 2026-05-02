@@ -17,10 +17,15 @@ interface Props {
   bookings: PublicBooking[];
 }
 
-const STATUS_STYLE = {
-  bezet: "bg-blue-100 text-blue-700",
-  optie: "bg-cyan-100 text-cyan-700",
-  geblokkeerd: "bg-warm-100 text-warm-500",
+const STATUS_BG: Record<"bezet" | "optie" | "geblokkeerd", string> = {
+  bezet: "#fde5e2",
+  optie: "#fef3c7",
+  geblokkeerd: "",
+};
+const STATUS_COLOR: Record<"bezet" | "optie" | "geblokkeerd", string> = {
+  bezet: "#b94a3a",
+  optie: "#92400e",
+  geblokkeerd: "",
 };
 
 export default function EmbedClient({ kalenderNaam, woningNaam, kleur, bookings }: Props) {
@@ -73,9 +78,8 @@ export default function EmbedClient({ kalenderNaam, woningNaam, kleur, bookings 
               return (
                 <div
                   key={day.toISOString()}
-                  className={`text-center py-1.5 rounded-lg text-xs font-medium ${
-                    status ? STATUS_STYLE[status] : "text-warm-600"
-                  }`}
+                  className="text-center py-1.5 rounded-lg text-xs font-medium"
+                  style={status && STATUS_BG[status] ? { backgroundColor: STATUS_BG[status], color: STATUS_COLOR[status] } : { color: "var(--warm-600, #5c5040)" }}
                 >
                   {format(day, "d")}
                 </div>
@@ -85,8 +89,8 @@ export default function EmbedClient({ kalenderNaam, woningNaam, kleur, bookings 
 
           {/* Legend */}
           <div className="flex gap-3 mt-3 pt-3 border-t border-warm-50 text-xs text-warm-400 justify-center">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-blue-100 inline-block" />Bezet</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-cyan-100 inline-block" />Optie</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded inline-block" style={{ backgroundColor: "#fde5e2" }} />Bezet</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded inline-block" style={{ backgroundColor: "#fef3c7" }} />Optie</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded inline-block bg-warm-50 border border-warm-100" />Vrij</span>
           </div>
         </div>

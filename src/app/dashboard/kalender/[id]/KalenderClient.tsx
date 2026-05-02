@@ -12,11 +12,13 @@ import {
   isWithinInterval,
   parseISO,
   addMonths,
+  addDays,
   subMonths,
   isBefore,
   isToday,
   isPast,
   startOfWeek,
+  startOfDay,
   endOfWeek,
   eachWeekOfInterval,
   getISOWeek,
@@ -114,6 +116,8 @@ interface FormData {
   notitiesVerborgen: boolean;
   priveNotities: string;
   bron: string;
+  editStartDatum: string;
+  editEindDatum: string;
   facturatiePrijs: string;
   prijsTotaal: string;
   gastEmail: string;
@@ -137,6 +141,8 @@ const EMPTY_FORM: FormData = {
   notitiesVerborgen: false,
   priveNotities: "",
   bron: "",
+  editStartDatum: "",
+  editEindDatum: "",
   facturatiePrijs: "",
   prijsTotaal: "",
   gastEmail: "",
@@ -158,9 +164,11 @@ function bookingToFormData(b: Booking): FormData {
     gastNaam: b.gast_naam || "",
     status: b.status,
     notities: b.notities || "",
-    notitiesVerborgen: false, // no DB field yet — defaults to false
+    notitiesVerborgen: false,
     priveNotities: b.prive_notities || "",
     bron: b.bron || "",
+    editStartDatum: b.start_datum,
+    editEindDatum: b.eind_datum,
     facturatiePrijs: b.facturatie_prijs?.toString() || "",
     prijsTotaal: b.prijs_totaal?.toString() || "",
     gastEmail: b.gast_email || "",
@@ -411,6 +419,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const { error } = await supabase
       .from("bookings")
       .update({
+        start_datum: formData.editStartDatum || editingBooking.start_datum,
+        eind_datum: formData.editEindDatum || editingBooking.eind_datum,
         gast_naam: formData.gastNaam || null,
         gast_email: formData.gastEmail || null,
         gast_telefoon: formData.gastTelefoon || null,
@@ -438,6 +448,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           b.id === editingBooking.id
             ? {
                 ...b,
+                start_datum: formData.editStartDatum || b.start_datum,
+                eind_datum: formData.editEindDatum || b.eind_datum,
                 gast_naam: formData.gastNaam || null,
                 gast_email: formData.gastEmail || null,
                 gast_telefoon: formData.gastTelefoon || null,
@@ -815,8 +827,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             <button
               onClick={() => {
                 setSelecting(false);
-                setSelectStart(new Date());
-                setSelectEnd(new Date());
+                const today = startOfDay(new Date());
+                setSelectStart(today);
+                setSelectEnd(addDays(today, 1));
                 setFormData(EMPTY_FORM);
                 setModal("new");
               }}
@@ -1320,21 +1333,41 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           MODAL: nieuwe reservatie (extended)
           ============================================================ */}
       {modal === "new" && selectStart && selectEnd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6" onClick={cancelModal}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] px-4 py-6" onClick={cancelModal}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-warm-100">
-              <div>
+            <div className="px-6 pt-6 pb-4 border-b border-warm-100">
+              <div className="flex items-start justify-between mb-3">
                 <h3 className="text-lg font-bold text-warm-900">Reservatie toevoegen</h3>
-                <p className="text-sm text-warm-400 mt-0.5">
-                  {format(selectStart, "d MMMM", { locale: nl })} t/m {format(selectEnd, "d MMMM yyyy", { locale: nl })}
-                  {" · "}
-                  {Math.round((selectEnd.getTime() - selectStart.getTime()) / (1000 * 60 * 60 * 24))} nachten
-                </p>
+                <button onClick={cancelModal} className="w-8 h-8 rounded-lg hover:bg-warm-100 flex items-center justify-center text-warm-400 transition-colors shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
               </div>
-              <button onClick={cancelModal} className="w-8 h-8 rounded-lg hover:bg-warm-100 flex items-center justify-center text-warm-400 transition-colors shrink-0 mt-0.5">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-warm-400 mb-1">Aankomst</label>
+                  <input
+                    type="date"
+                    value={format(selectStart, "yyyy-MM-dd")}
+                    onChange={e => { if (e.target.value) setSelectStart(parseISO(e.target.value)); }}
+                    className="w-full border border-warm-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-warm-400 mb-1">Vertrek</label>
+                  <input
+                    type="date"
+                    value={format(selectEnd, "yyyy-MM-dd")}
+                    onChange={e => { if (e.target.value) setSelectEnd(parseISO(e.target.value)); }}
+                    className="w-full border border-warm-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                  />
+                </div>
+                <div className="self-end pb-2">
+                  <span className="text-xs text-warm-400">
+                    {Math.max(0, Math.round((selectEnd.getTime() - selectStart.getTime()) / 86400000))} nachten
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-warm-100">
@@ -1630,7 +1663,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           MODAL: reservatie bewerken (huurkalender.nl style, two-column)
           ============================================================ */}
       {modal === "edit" && editingBooking && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6" onClick={cancelModal}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] px-4 py-6" onClick={cancelModal}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
             {/* Header */}
@@ -1675,9 +1708,12 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 <div>
                   <label className="block text-sm font-medium text-warm-700 mb-1.5">Aankomst</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-warm-700 bg-warm-50 border border-warm-200 rounded-xl px-3 py-2.5 flex-1 font-medium">
-                      {format(parseISO(editingBooking.start_datum), "EEE d MMMM yyyy", { locale: nl })}
-                    </span>
+                    <input
+                      type="date"
+                      value={formData.editStartDatum}
+                      onChange={e => setFormData(f => ({ ...f, editStartDatum: e.target.value }))}
+                      className="flex-1 border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
                     <input
                       type="time"
                       value={formData.checkInTijd}
@@ -1685,17 +1721,17 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       className="w-28 border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                     />
                   </div>
-                  {formData.checkInTijd === "12:00" && (
-                    <p className="text-xs text-warm-400 mt-1">halve dag</p>
-                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-warm-700 mb-1.5">Vertrek</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-warm-700 bg-warm-50 border border-warm-200 rounded-xl px-3 py-2.5 flex-1 font-medium">
-                      {format(parseISO(editingBooking.eind_datum), "EEE d MMMM yyyy", { locale: nl })}
-                    </span>
+                    <input
+                      type="date"
+                      value={formData.editEindDatum}
+                      onChange={e => setFormData(f => ({ ...f, editEindDatum: e.target.value }))}
+                      className="flex-1 border border-warm-200 rounded-xl px-3 py-2.5 text-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none"
+                    />
                     <input
                       type="time"
                       value={formData.checkUitTijd}
@@ -1709,7 +1745,9 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 <div className="flex items-center justify-between py-2 border-t border-b border-warm-100">
                   <span className="text-sm text-warm-500">Aantal nachten</span>
                   <span className="text-sm font-semibold text-warm-800">
-                    {calcNachten(editingBooking.start_datum, editingBooking.eind_datum)}
+                    {formData.editStartDatum && formData.editEindDatum
+                      ? calcNachten(formData.editStartDatum, formData.editEindDatum)
+                      : calcNachten(editingBooking.start_datum, editingBooking.eind_datum)}
                   </span>
                 </div>
 

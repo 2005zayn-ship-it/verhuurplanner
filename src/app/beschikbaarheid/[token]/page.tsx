@@ -43,10 +43,15 @@ function getStatusForDay(date: Date, bookings: PublicBooking[]): "bezet" | "opti
   return match?.status ?? null;
 }
 
-const STATUS_STYLE: Record<"bezet" | "optie" | "geblokkeerd", string> = {
-  bezet: "bg-blue-100 text-blue-700",
-  optie: "bg-cyan-100 text-cyan-700",
-  geblokkeerd: "bg-warm-100 text-warm-500",
+const STATUS_BG: Record<"bezet" | "optie" | "geblokkeerd", string> = {
+  bezet: "#fde5e2",
+  optie: "#fef3c7",
+  geblokkeerd: "",
+};
+const STATUS_COLOR: Record<"bezet" | "optie" | "geblokkeerd", string> = {
+  bezet: "#b94a3a",
+  optie: "#92400e",
+  geblokkeerd: "",
 };
 
 function MonthGrid({ month, bookings }: { month: Date; bookings: PublicBooking[] }) {
@@ -75,9 +80,8 @@ function MonthGrid({ month, bookings }: { month: Date; bookings: PublicBooking[]
             return (
               <div
                 key={day.toISOString()}
-                className={`text-center py-2 rounded-lg text-sm font-medium ${
-                  status ? STATUS_STYLE[status] : "text-warm-700"
-                }`}
+                className="text-center py-2 rounded-lg text-sm font-medium"
+                style={status && STATUS_BG[status] ? { backgroundColor: STATUS_BG[status], color: STATUS_COLOR[status] } : undefined}
               >
                 {format(day, "d")}
               </div>
@@ -145,11 +149,11 @@ export default async function BeschikbaarheidPage({ params }: PageProps) {
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mb-6 text-sm text-warm-600">
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200 inline-block" />
+            <span className="w-3 h-3 rounded inline-block" style={{ backgroundColor: "#fde5e2", border: "1px solid #f3b5ad" }} />
             Bezet
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-cyan-100 border border-cyan-200 inline-block" />
+            <span className="w-3 h-3 rounded inline-block" style={{ backgroundColor: "#fef3c7", border: "1px solid #fde68a" }} />
             Optie
           </span>
           <span className="flex items-center gap-2">
