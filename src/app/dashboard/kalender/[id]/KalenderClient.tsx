@@ -585,7 +585,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     const monthNumber = format(month, "MM");
 
     return (
-      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-2xl overflow-hidden" style={{ minWidth: 240 }}>
+      <div key={month.toISOString()} className="bg-white border border-warm-100 rounded-2xl overflow-hidden shrink-0" style={{ width: 248 }}>
         {/* Month header */}
         <div className="relative px-3 pt-3 pb-2 border-b border-warm-100 bg-warm-50">
           <div className="flex items-baseline gap-1.5">
@@ -903,24 +903,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </button>
           </div>
 
-          {/* Multi-month calendar grid */}
-          <div
-            className={`grid gap-3 mb-4 ${
-              aantalMaanden === 1
-                ? "grid-cols-1 max-w-xs"
-                : aantalMaanden === 2
-                ? "grid-cols-1 sm:grid-cols-2"
-                : aantalMaanden === 3
-                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                : aantalMaanden === 4
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
-                : aantalMaanden === 5
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5"
-                : aantalMaanden === 6
-                ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
-                : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
-            }`}
-          >
+          {/* Multi-month calendar grid — flex-wrap so cards keep their natural width */}
+          <div className="flex flex-wrap gap-3 items-start mb-4">
             {months.map(m => renderMonth(m))}
           </div>
 
