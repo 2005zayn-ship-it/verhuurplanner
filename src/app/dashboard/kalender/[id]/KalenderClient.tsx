@@ -692,7 +692,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     }}
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
-                      "relative select-none transition-colors",
+                      "relative h-8 flex items-center justify-center select-none transition-colors",
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50" : "",
@@ -700,30 +700,28 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       isPastDay && isCurrentMonth ? "opacity-40" : "",
                       isHighlighted ? "ring-2 ring-inset ring-accent" : "",
                     ].filter(Boolean).join(" ")}
-                    style={{ paddingTop: "100%", ...(isCurrentMonth ? cellStyle : {}) }}
+                    style={isCurrentMonth ? cellStyle : {}}
                   >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className={[
-                        "text-[11px] font-medium leading-none relative z-10",
-                        isFull ? "text-white" : "",
-                        isSplit ? "text-warm-800 font-semibold" : "",
-                        isCurrentMonth && !hasAnyBooking && !inSel ? "text-warm-700" : "",
-                        isCurrentMonth && !hasAnyBooking && inSel ? "text-accent font-semibold" : "",
-                      ].filter(Boolean).join(" ")}>
-                        {format(day, "d")}
-                      </span>
+                    <span className={[
+                      "text-[11px] font-medium leading-none relative z-10",
+                      isFull ? "text-white" : "",
+                      isSplit ? "text-warm-800 font-semibold" : "",
+                      isCurrentMonth && !hasAnyBooking && !inSel ? "text-warm-700" : "",
+                      isCurrentMonth && !hasAnyBooking && inSel ? "text-accent font-semibold" : "",
+                    ].filter(Boolean).join(" ")}>
+                      {format(day, "d")}
+                    </span>
 
-                      {isTod && isCurrentMonth && (
-                        <span
-                          className="absolute inset-0 pointer-events-none z-20"
-                          style={{ border: "2px solid #2563eb", boxShadow: hasAnyBooking ? "0 0 0 1px white inset" : undefined }}
-                        />
-                      )}
+                    {isTod && isCurrentMonth && (
+                      <span
+                        className="absolute inset-0 pointer-events-none z-20"
+                        style={{ border: "2px solid var(--accent, #2e7dba)", boxShadow: hasAnyBooking ? "0 0 0 1px white inset" : undefined }}
+                      />
+                    )}
 
-                      {isCurrentMonth && primaryBooking?.gast_naam && dateStr === primaryBooking.start_datum && (
-                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-60 pointer-events-none z-10" />
-                      )}
-                    </div>
+                    {isCurrentMonth && primaryBooking?.gast_naam && dateStr === primaryBooking.start_datum && (
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white opacity-60 pointer-events-none z-10" />
+                    )}
                   </div>
                 );
               })}
@@ -927,13 +925,22 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
             </button>
           </div>
 
-          {/* Multi-month calendar — vult volledige breedte, cellen zijn altijd vierkant */}
-          <div
-            className="grid gap-3 mb-4"
-            style={{ gridTemplateColumns: `repeat(${aantalMaanden}, 1fr)` }}
-          >
-            {months.map(m => renderMonth(m))}
-          </div>
+          {/* Multi-month calendar — gecentreerd met witruimte links/rechts zoals huurkalender.nl */}
+          {(() => {
+            const cols = Math.min(aantalMaanden, 4);
+            const maxW = cols * 280 + (cols - 1) * 12;
+            return (
+              <div
+                className="grid gap-3 mb-4 mx-auto w-full"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                  maxWidth: `${maxW}px`,
+                }}
+              >
+                {months.map(m => renderMonth(m))}
+              </div>
+            );
+          })()}
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-warm-500 mb-6 px-1">
