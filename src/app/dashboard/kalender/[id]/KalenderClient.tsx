@@ -616,7 +616,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
               style={{ gridTemplateColumns: colTemplate }}
             >
               {/* Week number */}
-              <div className="h-9 flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
+              <div className="flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
                 {weekNum}
               </div>
 
@@ -656,7 +656,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     }}
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
-                      "relative h-9 flex items-center justify-center text-[11px] font-medium select-none transition-colors",
+                      "relative aspect-square flex items-center justify-center text-xs font-medium select-none transition-colors",
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50 text-warm-700" : "",
@@ -884,8 +884,8 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
 
           {/* Multi-month calendar grid — fills full width, equal columns like huurkalender.nl */}
           <div
-            className="grid gap-3 mb-4"
-            style={{ gridTemplateColumns: `repeat(${aantalMaanden === 12 ? 4 : aantalMaanden}, 1fr)` }}
+            className={`grid gap-3 mb-4${aantalMaanden === 1 ? " max-w-sm" : ""}`}
+            style={{ gridTemplateColumns: `repeat(${aantalMaanden === 1 ? 1 : aantalMaanden === 2 ? 2 : aantalMaanden === 4 ? 4 : aantalMaanden <= 6 ? 3 : 4}, 1fr)` }}
           >
             {months.map(m => renderMonth(m))}
           </div>
