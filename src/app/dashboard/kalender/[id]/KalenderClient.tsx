@@ -693,7 +693,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     }}
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
-                      "relative h-10 flex items-center justify-center select-none transition-colors",
+                      "relative flex items-center justify-center select-none transition-colors",
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50" : "",
@@ -701,7 +701,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                       isPastDay && isCurrentMonth ? "opacity-40" : "",
                       isHighlighted ? "ring-2 ring-inset ring-accent" : "",
                     ].filter(Boolean).join(" ")}
-                    style={isCurrentMonth ? cellStyle : {}}
+                    style={{ aspectRatio: "1", ...(isCurrentMonth ? cellStyle : {}) }}
                   >
                     <span className={[
                       "text-[11px] font-medium leading-none relative z-10",
