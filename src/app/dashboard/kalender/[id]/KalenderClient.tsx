@@ -86,7 +86,7 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   geblokkeerd: "Geblokkeerd",
 };
 
-// Inline style colors for diagonal split rendering
+// Inline style colors for booking cells
 const STATUS_HEX: Record<BookingStatus, string> = {
   bezet: "#f07e6f",
   optie: "#f59e0b",
@@ -268,7 +268,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
   }
 
   // --- Day cell style calculation ---
-  // Vertical split: checkout = left half, checkin = right half (industry standard)
   function getDayCellStyle(
     dateStr: string,
     arrivalBooking: Booking | null,
@@ -278,19 +277,17 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
     if (fullBooking && !arrivalBooking && !departureBooking) {
       return { backgroundColor: STATUS_HEX[fullBooking.status] };
     }
-    // Diagonale split: vertrek = linksboven driehoek, aankomst = rechtsonder driehoek
     if (arrivalBooking && departureBooking) {
-      const dep = STATUS_HEX[departureBooking.status];
-      const arr = STATUS_HEX[arrivalBooking.status];
-      return { background: `linear-gradient(to bottom right, ${dep} 50%, ${arr} 50%)` };
+      // Wisseldag: vertrek links-onder, aankomst rechts-boven
+      return {
+        background: `linear-gradient(to top right, ${STATUS_HEX[departureBooking.status]} 50%, ${STATUS_HEX[arrivalBooking.status]} 50%)`,
+      };
     }
     if (arrivalBooking) {
-      const color = STATUS_HEX[arrivalBooking.status];
-      return { background: `linear-gradient(to bottom right, transparent 50%, ${color} 50%)` };
+      return { backgroundColor: STATUS_HEX[arrivalBooking.status] };
     }
     if (departureBooking) {
-      const color = STATUS_HEX[departureBooking.status];
-      return { background: `linear-gradient(to bottom right, ${color} 50%, transparent 50%)` };
+      return { backgroundColor: STATUS_HEX[departureBooking.status] };
     }
     return {};
   }
@@ -642,24 +639,22 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
           ))}
         </div>
 
-        {/* Week rows */}
-        {weeks.map((weekStart, wi) => {
-          const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
-          const weekNum = getISOWeek(weekStart);
+        {/* Één platte grid — alle weken in dezelfde grid-context, geen sub-pixel accumulation */}
+        <div className="grid" style={{ gridTemplateColumns: colTemplate }}>
+          {weeks.flatMap((weekStart, wi) => {
+            const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
+            const weekNum = getISOWeek(weekStart);
+            const borderTop = wi > 0 ? "border-t border-warm-50" : "";
 
-          return (
-            <div
-              key={weekStart.toISOString()}
-              className={`grid${wi > 0 ? " border-t border-warm-50" : ""}`}
-              style={{ gridTemplateColumns: colTemplate }}
-            >
-              {/* Week number — zelfde hoogte als rij via self-stretch */}
-              <div className="self-stretch flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50">
+            return [
+              <div
+                key={`wn-${weekStart.toISOString()}`}
+                className={`flex items-center justify-center text-[9px] text-warm-300 font-medium select-none border-r border-warm-50 ${borderTop}`}
+              >
                 {weekNum}
-              </div>
+              </div>,
 
-              {/* Day cells — padding-top:100% maakt hoogte = breedte = vierkant */}
-              {weekDays.map(day => {
+              ...weekDays.map(day => {
                 const isCurrentMonth = day.getMonth() === month.getMonth();
                 const dateStr = format(day, "yyyy-MM-dd");
                 const dayBookings = getBookingsForDay(dateStr);
@@ -674,6 +669,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 const departureBooking = departureBookings[0] ?? null;
                 const hasAnyBooking = dayBookings.length > 0;
                 const primaryBooking = fullBooking ?? arrivalBooking ?? departureBooking ?? null;
+                const isWisseldag = !!(arrivalBooking && departureBooking);
 
                 const inSel = isInSelection(day);
                 const isTod = isToday(day);
@@ -681,7 +677,6 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                 const isHighlighted = zoekQuery.trim().length > 0 && zoekResultaten.some(b => dateStr >= b.start_datum && dateStr <= b.eind_datum);
                 const cellStyle = isCurrentMonth ? getDayCellStyle(dateStr, arrivalBooking, departureBooking, fullBooking) : {};
                 const isFull = isCurrentMonth && fullBooking && !arrivalBooking && !departureBooking;
-                const isSplit = isCurrentMonth && (arrivalBooking || departureBooking);
 
                 return (
                   <div
@@ -694,6 +689,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     onMouseLeave={() => { setHoverDate(null); hideTooltipDelayed(); }}
                     className={[
                       "relative flex items-center justify-center select-none transition-colors",
+                      borderTop,
                       isCurrentMonth ? "cursor-pointer" : "cursor-default",
                       !isCurrentMonth ? "opacity-0 pointer-events-none" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "hover:bg-warm-50" : "",
@@ -705,8 +701,7 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                   >
                     <span className={[
                       "text-[11px] font-medium leading-none relative z-10",
-                      isFull ? "text-white" : "",
-                      isSplit ? "text-warm-800 font-semibold" : "",
+                      isFull || isWisseldag ? "text-white" : "",
                       isCurrentMonth && !hasAnyBooking && !inSel ? "text-warm-700" : "",
                       isCurrentMonth && !hasAnyBooking && inSel ? "text-accent font-semibold" : "",
                     ].filter(Boolean).join(" ")}>
@@ -725,10 +720,10 @@ export default function KalenderClient({ calendar, initialBookings, initialIcalI
                     )}
                   </div>
                 );
-              })}
-            </div>
-          );
-        })}
+              }),
+            ];
+          })}
+        </div>
       </div>
     );
   }
